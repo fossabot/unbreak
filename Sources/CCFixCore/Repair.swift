@@ -8,9 +8,8 @@ import Foundation
 /// `repair(_:profile:options:)` and decide what to do from the returned report.
 ///
 /// Implemented so far: §6.1 normalize (ANSI/OSC stripping + CRLF/CR), §6.2
-/// de-gutter, §6.3 rejoin.
-/// TODO: §6.4 heredoc protection, §6.5 merge-split, §6.6 non-Claude profiles,
-/// §6.7 full confidence scoring.
+/// de-gutter, §6.3 rejoin, §6.4 heredoc protection.
+/// TODO: §6.5 merge-split, §6.6 non-Claude profiles, §6.7 full confidence scoring.
 public enum Repair {
     public static func repair(
         _ input: String,
@@ -18,8 +17,21 @@ public enum Repair {
         options: RepairOptions = .init()
     ) -> RepairResult {
         let normalized = normalize(input)
-        let (dedented, dedentChanged) = degutter(normalized, tabWidth: profile.tabWidth)
-        let rejoined = rejoin(dedented, profile: profile, options: options)
+        // §6.4: mark heredoc bodies up front so de-gutter and rejoin leave them
+        // untouched. Line indices are stable across de-gutter (it rewrites lines
+        // in place, never adding or removing any), so the same set applies to both.
+        let heredoc = Heredoc.detect(splitLines(normalized))
+        let (dedented, dedentChanged) = degutter(
+            normalized,
+            tabWidth: profile.tabWidth,
+            protected: heredoc.protectedLines
+        )
+        let rejoined = rejoin(
+            dedented,
+            profile: profile,
+            options: options,
+            protected: heredoc.protectedLines
+        )
 
         let report = RepairReport(
             changed: rejoined.text != input,
@@ -27,7 +39,7 @@ public enum Repair {
             wrapColumnConfidence: rejoined.confidence,
             shellSignalScore: 0,  // TODO(§7 gate 5): discrete tier scoring
             structureRisk: 0,  // TODO(§7 gate 6): structure-risk veto
-            heredocDetected: false,  // TODO(§6.4)
+            heredocDetected: heredoc.detected,
             detectedWidth: rejoined.detectedWidth
         )
         return RepairResult(text: rejoined.text, report: report)
@@ -91,22 +103,29 @@ public enum Repair {
 
     // MARK: - §6.2 De-gutter (dedent, robust to a partially selected line 1)
 
-    static func degutter(_ text: String, tabWidth: Int) -> (String, Bool) {
+    static func degutter(
+        _ text: String,
+        tabWidth: Int,
+        protected: Set<Int> = []
+    ) -> (String, Bool) {
         let lines = splitLines(text)
         guard lines.count >= 2 else { return (text, false) }
 
-        // Gutter `G` = minimum leading width over non-blank lines 2..n.
-        let tail = lines.dropFirst()
+        // Gutter `G` = minimum leading width over non-blank lines 2..n, excluding
+        // heredoc bodies (§6.4) — their intentional indentation must not skew `G`.
         let indents =
-            tail
-            .filter { !isBlank($0) }
-            .map { DisplayWidth.leadingWidth(of: $0, tabWidth: tabWidth) }
+            lines.enumerated()
+            .dropFirst()
+            .filter { !protected.contains($0.offset) && !isBlank($0.element) }
+            .map { DisplayWidth.leadingWidth(of: $0.element, tabWidth: tabWidth) }
         guard let g = indents.min(), g > 0 else { return (text, false) }
 
         var out: [String] = []
         out.reserveCapacity(lines.count)
         for (idx, line) in lines.enumerated() {
-            if idx == 0 {
+            if protected.contains(idx) {
+                out.append(line)  // §6.4: heredoc body left untouched
+            } else if idx == 0 {
                 let firstIndent = DisplayWidth.leadingWidth(of: line, tabWidth: tabWidth)
                 out.append(
                     removeLeadingColumns(line, upTo: min(firstIndent, g), tabWidth: tabWidth)
@@ -131,7 +150,8 @@ public enum Repair {
     static func rejoin(
         _ text: String,
         profile: WrapProfile,
-        options: RepairOptions
+        options: RepairOptions,
+        protected: Set<Int> = []
     ) -> RejoinResult {
         let lines = splitLines(text)
         guard lines.count >= 2 else {
@@ -140,10 +160,14 @@ public enum Repair {
 
         let widths = lines.map { DisplayWidth.width(of: $0, tabWidth: profile.tabWidth) }
         let detected = options.forcedWidth ?? detectWidth(widths)
-        guard let w = detected else {
-            let joined = options.joinAll ? lines.joined(separator: " ") : text
-            return RejoinResult(text: joined, confidence: 0, detectedWidth: nil)
+        // With no detectable wrap column we only act under `--join-all`; otherwise
+        // the text is returned untouched. `--join-all` then collapses through the
+        // same loop below (with an unbounded width so every seam qualifies), so it
+        // still honors the heredoc protections in §6.4.
+        if detected == nil, !options.joinAll {
+            return RejoinResult(text: text, confidence: 0, detectedWidth: nil)
         }
+        let w = detected ?? Int.max
 
         var out: [String] = []
         var joins = 0
@@ -155,6 +179,10 @@ public enum Repair {
             // *original* line `i`, so a run of full lines collapses correctly and
             // the operation stays idempotent.
             while i < lines.count - 1 {
+                // §6.4: never merge into or across a heredoc body — the opener
+                // line must not absorb the first body line, and body newlines are
+                // intentional. joinAll cannot override this.
+                if protected.contains(i) || protected.contains(i + 1) { break }
                 let lineWidth = widths[i]
                 let isFull = lineWidth >= w - 2 && lineWidth <= w
                 let endsContinuation = profile.continuationTokens.contains {
@@ -177,7 +205,7 @@ public enum Repair {
         return RejoinResult(
             text: out.joined(separator: "\n"),
             confidence: confidence,
-            detectedWidth: w
+            detectedWidth: detected  // nil under the --join-all fallback (sentinel w)
         )
     }
 
