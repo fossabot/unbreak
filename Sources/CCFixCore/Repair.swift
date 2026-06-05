@@ -2,14 +2,16 @@ import Foundation
 
 /// The pure, deterministic repair pipeline (PRD v2 §6):
 ///
-///   normalize → dedent → rejoin → render → (String, RepairReport)
+///   normalize → (de-gutter → rejoin)* → optional merge-split → (String, RepairReport)
 ///
 /// No I/O, no globals, no clipboard access. The CLI and the watcher both call
 /// `repair(_:profile:options:)` and decide what to do from the returned report.
 ///
-/// Implemented so far: §6.1 normalize (ANSI/OSC stripping + CRLF/CR), §6.2
-/// de-gutter, §6.3 rejoin, §6.4 heredoc protection.
-/// TODO: §6.5 merge-split, §6.6 non-Claude profiles, §6.7 full confidence scoring.
+/// Implemented: §6.1 normalize (ANSI/OSC stripping + CRLF/CR), §6.2 de-gutter,
+/// §6.3 rejoin, §6.4 heredoc protection, §6.5 merge-split (opt-in), §6.7
+/// confidence signals. The de-gutter/rejoin core is iterated to a fixed point so
+/// the whole function is idempotent (§6.8).
+/// TODO: §6.6 non-Claude profiles.
 public enum Repair {
     public static func repair(
         _ input: String,
@@ -17,30 +19,52 @@ public enum Repair {
         options: RepairOptions = .init()
     ) -> RepairResult {
         let normalized = normalize(input)
-        // §6.4: mark heredoc bodies up front so de-gutter and rejoin leave them
-        // untouched. Line indices are stable across de-gutter (it rewrites lines
-        // in place, never adding or removing any), so the same set applies to both.
-        let heredoc = Heredoc.detect(splitLines(normalized))
-        let (dedented, dedentChanged) = degutter(
-            normalized,
-            tabWidth: profile.tabWidth,
-            protected: heredoc.protectedLines
-        )
-        let rejoined = rejoin(
-            dedented,
-            profile: profile,
-            options: options,
-            protected: heredoc.protectedLines
-        )
+
+        // §6.4 + §6.8: iterate de-gutter → rejoin to a fixed point. One pass is not
+        // idempotent — rejoin merges full lines, and on a fresh pass those merged
+        // lines can form a *new* dominant width that `detectWidth` would merge
+        // again, cascading. The pair is monotone (line count and leading whitespace
+        // only ever decrease), so it converges; the converged text is a true fixed
+        // point, which is what makes `repair` idempotent. Heredocs are re-detected
+        // each round because a merge upstream shifts body line indices.
+        var working = normalized
+        var dedentChanged = false
+        var firstConfidence = 0.0
+        var firstWidth: Int?
+        var heredocDetected = false
+        let maxIterations = splitLines(normalized).count + 2
+        for iteration in 0..<maxIterations {
+            let heredoc = Heredoc.detect(splitLines(working))
+            let (dedented, dc) = degutter(
+                working,
+                tabWidth: profile.tabWidth,
+                protected: heredoc.protectedLines
+            )
+            let rejoined = rejoin(
+                dedented,
+                profile: profile,
+                options: options,
+                protected: heredoc.protectedLines
+            )
+            dedentChanged = dedentChanged || dc
+            if iteration == 0 {
+                firstConfidence = rejoined.confidence
+                firstWidth = rejoined.detectedWidth
+                heredocDetected = heredoc.detected
+            }
+            if rejoined.text == working { break }
+            working = rejoined.text
+        }
 
         // §6.5: optional, lossy merge-artifact split — off unless the caller opts
-        // in. Runs after rejoin (it works on the over-long lines rejoin leaves) and
-        // skips heredoc bodies.
-        var finalText = rejoined.text
+        // in. Runs once after the fixed point (it works on the over-long lines that
+        // remain) and skips heredoc bodies; it is intentionally not part of the
+        // idempotence guarantee.
+        var finalText = working
         if options.splitPaddingArtifacts {
             // A forced width applies even when rejoin saw a single line (and so
             // reported no detected column).
-            let splitWidth = options.forcedWidth ?? rejoined.detectedWidth
+            let splitWidth = options.forcedWidth ?? firstWidth
             finalText = MergeSplit.split(finalText, profile: profile, width: splitWidth).text
         }
 
@@ -53,11 +77,11 @@ public enum Repair {
         let report = RepairReport(
             changed: finalText != input,
             dedentChanged: dedentChanged,
-            wrapColumnConfidence: rejoined.confidence,
+            wrapColumnConfidence: firstConfidence,
             shellSignalScore: shell.score,
             structureRisk: structure.risk,
-            heredocDetected: heredoc.detected,
-            detectedWidth: rejoined.detectedWidth
+            heredocDetected: heredocDetected,
+            detectedWidth: firstWidth
         )
         return RepairResult(text: finalText, report: report)
     }

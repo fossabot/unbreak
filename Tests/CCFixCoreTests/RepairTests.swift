@@ -85,6 +85,48 @@ struct RepairTests {
         #expect(result.text == input)
     }
 
+    // MARK: §6.8 Structure preservation (§5 Cases 3/4/6 round-trips)
+
+    @Test("Case 3: a partially selected first line dedents to the continuation gutter")
+    func case3PartialFirstLineRoundTrip() {
+        // Line 1 has 1 leading space; the gutter (4) comes from lines 2..n.
+        let input = " git push\n    --force\n    origin"
+        #expect(Repair.repair(input).text == "git push\n--force\norigin")
+    }
+
+    @Test("Case 4: an unbreakable long token (URL) is left intact")
+    func case4UnbreakableToken() {
+        // No interior space to wrap at → nothing to rejoin or split.
+        let url = "https://example.com/" + String(repeating: "a", count: 120)
+        #expect(Repair.repair(url).text == url)
+    }
+
+    @Test("Case 6: a `\\` continuation layout is never rejoined into one line")
+    func case6BackslashLayoutRoundTrip() {
+        // De-gutter may strip a uniform leading indent (indistinguishable from the
+        // render gutter), but the `\`-terminated newlines must survive — the lines
+        // are never merged.
+        let input = "docker run --rm \\\n  -v $PWD:/app \\\n  image:latest"
+        let out = Repair.repair(input).text
+        #expect(out.split(separator: "\n", omittingEmptySubsequences: false).count == 3)
+        #expect(out.contains("--rm \\"))
+        #expect(out.contains("image:latest"))
+    }
+
+    @Test("Case 6: a heredoc body keeps its intentional internal spacing")
+    func case6HeredocInternalSpacing() {
+        let input = "cat <<EOF\n  col1    col2\n  data    here\nEOF"
+        let result = Repair.repair(input)
+        #expect(result.text == input)
+        #expect(result.report.heredocDetected)
+    }
+
+    @Test("Case 6: internal multiple spaces outside a wrap seam are preserved")
+    func case6InternalSpaces() {
+        let input = "echo a    b    c"
+        #expect(Repair.repair(input).text == input)
+    }
+
     // MARK: §6.8 Guarantees
 
     @Test("Clean single-line input is returned unchanged")

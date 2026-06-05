@@ -44,4 +44,68 @@ struct PropertyTests {
         let twice = Repair.repair(once).text
         #expect(once == twice)
     }
+
+    /// A grab-bag of fragments that exercise every artifact class: gutters, full
+    /// wrap-width lines, continuations, blanks, heredocs, CJK/emoji width, ANSI
+    /// escapes, unbreakable tokens, and intentional internal spacing.
+    private func randomMessyInput(_ rng: inout SeededGenerator) -> String {
+        let palette = [
+            "git status", "  && cd src", "echo hello world", "| grep foo",
+            String(repeating: "x", count: 42), String(repeating: "y", count: 40) + " tail",
+            "    nested indent", "café résumé naïve", "日本語のテキストです",
+            "👨‍👩‍👧‍👦 family emoji", "\u{1B}[31mred text\u{1B}[0m", "cat <<EOF",
+            "heredoc body line", "EOF", "https://example.com/" + String(repeating: "a", count: 80),
+            "multiple    internal     spaces", "deploy \\", "", "   ", "\trun --flag",
+        ]
+        let count = Int.random(in: 1...8, using: &rng)
+        let lines = (0..<count).map { _ in palette.randomElement(using: &rng)! }
+        return lines.joined(separator: "\n")
+    }
+
+    @Test("Idempotent on messy fuzz input — default options", arguments: 0..<500)
+    func idempotentFuzzDefault(seed: Int) {
+        var rng = SeededGenerator(seed: UInt64(seed) &+ 50_000)
+        let input = randomMessyInput(&rng)
+        let once = Repair.repair(input).text
+        let twice = Repair.repair(once).text
+        #expect(once == twice)
+    }
+
+    @Test("Idempotent on messy fuzz input — forced width", arguments: 0..<500)
+    func idempotentFuzzForcedWidth(seed: Int) {
+        var rng = SeededGenerator(seed: UInt64(seed) &+ 90_000)
+        let input = randomMessyInput(&rng)
+        let opts = RepairOptions(forcedWidth: 42)
+        let once = Repair.repair(input, options: opts).text
+        let twice = Repair.repair(once, options: opts).text
+        #expect(once == twice)
+    }
+
+    /// Repairing an already-repaired fragment is a no-op — the fixed point the
+    /// watcher relies on to avoid re-mutating its own output.
+    @Test("Repaired output is a fixed point", arguments: 0..<500)
+    func repairedOutputIsFixedPoint(seed: Int) {
+        var rng = SeededGenerator(seed: UInt64(seed) &+ 70_000)
+        let repaired = Repair.repair(randomMessyInput(&rng)).text
+        #expect(Repair.repair(repaired).text == repaired)
+    }
+
+    // MARK: Lossless on clean fragments (§6.8)
+
+    @Test(
+        "Clean rich fragments pass through unchanged",
+        arguments: [
+            "git commit -m 'café'",
+            "kubectl get pods -n 日本",
+            "ls -la ~/Projects",
+            "echo a    b    c",
+            "curl https://example.com/" + String(repeating: "p", count: 90),
+            "rm -rf build && make",
+            "短い\nテスト",
+            "one\ntwo\nthree",
+        ]
+    )
+    func cleanRichFragmentsUnchanged(input: String) {
+        #expect(Repair.repair(input).text == input)
+    }
 }
