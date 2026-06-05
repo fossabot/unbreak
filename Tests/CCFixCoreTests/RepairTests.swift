@@ -10,6 +10,33 @@ struct RepairTests {
         #expect(Repair.normalize("a\r\nb\rc") == "a\nb\nc")
     }
 
+    @Test("Strips ANSI SGR color sequences (§6.1)")
+    func stripsSGR() {
+        // Red "git status" reset — the escapes must not survive or count as width.
+        #expect(Repair.normalize("\u{1B}[31mgit status\u{1B}[0m") == "git status")
+    }
+
+    @Test("Strips a multi-parameter CSI sequence (§6.1)")
+    func stripsCSI() {
+        #expect(Repair.normalize("a\u{1B}[1;32;40mb") == "ab")
+    }
+
+    @Test("Strips an OSC52 clipboard sequence terminated by BEL (§6.1, §13)")
+    func stripsOSC52BEL() {
+        #expect(Repair.normalize("\u{1B}]52;c;Zm9v\u{07}echo hi") == "echo hi")
+    }
+
+    @Test("Strips an OSC sequence terminated by ST (ESC backslash) (§6.1)")
+    func stripsOSCWithST() {
+        #expect(Repair.normalize("\u{1B}]0;title\u{1B}\\ls") == "ls")
+    }
+
+    @Test("Escape bytes do not count as display columns after normalize (§6.1)")
+    func escapesDoNotCountAsWidth() {
+        let colored = "\u{1B}[32m" + String(repeating: "x", count: 42) + "\u{1B}[0m"
+        #expect(DisplayWidth.width(of: Repair.normalize(colored)) == 42)
+    }
+
     // MARK: §6.2 De-gutter
 
     @Test("Removes the common gutter, preserving relative indent among lines 2..n (§5 cases 2/6)")

@@ -7,9 +7,10 @@ import Foundation
 /// No I/O, no globals, no clipboard access. The CLI and the watcher both call
 /// `repair(_:profile:options:)` and decide what to do from the returned report.
 ///
-/// Implemented so far: §6.1 normalize (CRLF/CR), §6.2 de-gutter, §6.3 rejoin.
-/// TODO: §6.1 ANSI/OSC stripping, §6.4 heredoc protection, §6.5 merge-split,
-/// §6.6 non-Claude profiles, §6.7 full confidence scoring.
+/// Implemented so far: §6.1 normalize (ANSI/OSC stripping + CRLF/CR), §6.2
+/// de-gutter, §6.3 rejoin.
+/// TODO: §6.4 heredoc protection, §6.5 merge-split, §6.6 non-Claude profiles,
+/// §6.7 full confidence scoring.
 public enum Repair {
     public static func repair(
         _ input: String,
@@ -35,10 +36,58 @@ public enum Repair {
 
     // MARK: - §6.1 Normalize
 
+    /// Strip terminal escape sequences, then collapse CRLF/CR to LF. Escapes are
+    /// removed *first* so their bytes never count as display columns (§6.1) or
+    /// survive into the repaired output — this is what locks down the Codex
+    /// `#8306` corruption fixtures (§13).
     static func normalize(_ input: String) -> String {
-        var s = input.replacingOccurrences(of: "\r\n", with: "\n")
+        var s = stripControlSequences(input)
+        s = s.replacingOccurrences(of: "\r\n", with: "\n")
         s = s.replacingOccurrences(of: "\r", with: "\n")
         return s
+    }
+
+    /// Remove ANSI CSI sequences (SGR colors, cursor moves), OSC payloads
+    /// (window titles, OSC52 clipboard writes — terminated by BEL or ST), and
+    /// other lone `ESC x` escapes. Tabs and newlines are preserved; everything
+    /// else passes through untouched.
+    static func stripControlSequences(_ input: String) -> String {
+        guard input.unicodeScalars.contains(where: { $0.value == 0x1B }) else {
+            return input  // fast path: no ESC, nothing to strip
+        }
+        let esc: UInt32 = 0x1B
+        let bel: UInt32 = 0x07
+        let scalars = Array(input.unicodeScalars)
+        var out = String.UnicodeScalarView()
+        out.reserveCapacity(scalars.count)
+        var i = 0
+        while i < scalars.count {
+            let c = scalars[i]
+            guard c.value == esc, i + 1 < scalars.count else {
+                out.append(c)
+                i += 1
+                continue
+            }
+            let next = scalars[i + 1].value
+            if next == 0x5B { // '[' — CSI: params/intermediates then a final byte 0x40–0x7E
+                i += 2
+                while i < scalars.count, !(0x40...0x7E).contains(scalars[i].value) { i += 1 }
+                if i < scalars.count { i += 1 } // consume the final byte
+            } else if next == 0x5D { // ']' — OSC: until BEL or ST (ESC '\')
+                i += 2
+                while i < scalars.count {
+                    if scalars[i].value == bel { i += 1; break }
+                    if scalars[i].value == esc, i + 1 < scalars.count, scalars[i + 1].value == 0x5C {
+                        i += 2
+                        break
+                    }
+                    i += 1
+                }
+            } else { // any other two-byte ESC sequence
+                i += 2
+            }
+        }
+        return String(out)
     }
 
     // MARK: - §6.2 De-gutter (dedent, robust to a partially selected line 1)
