@@ -12,35 +12,38 @@ struct RepairTests {
 
     // MARK: §6.2 De-gutter
 
-    @Test("Strips a uniform +2 gutter, preserving relative indent (§5 case 2)")
-    func dedentUniformGutter() {
-        let input = "  git clone foo\n    && cd foo"
+    @Test("Removes the common gutter, preserving relative indent among lines 2..n (§5 cases 2/6)")
+    func dedentRemovesGutterKeepsRelativeIndent() {
+        // Gutter = minimum indent of the continuation lines (4). Stripping it
+        // keeps the 4-space nesting difference between the two of them.
+        let input = "git clone foo\n    && cd foo\n        && nested"
         let (out, changed) = Repair.degutter(input, tabWidth: 8)
         #expect(changed)
-        #expect(out == "git clone foo\n  && cd foo")
+        #expect(out == "git clone foo\n&& cd foo\n    && nested")
     }
 
-    @Test("Computes gutter from lines 2..n when line 1 is partial (§5 case 3)")
-    func dedentPartialFirstLine() {
-        let input = "git clone foo\n    && cd foo"
+    @Test("Excludes a partially selected first line from gutter detection (§5 case 3)")
+    func dedentExcludesPartialFirstLine() {
+        // Line 1 has only 1 leading space (partial selection); the gutter (4) is
+        // computed from lines 2..n, and line 1 loses only min(1, 4) = 1 space.
+        let input = " git push\n    --force\n    origin"
         let (out, _) = Repair.degutter(input, tabWidth: 8)
-        #expect(out == "git clone foo\n  && cd foo")
+        #expect(out == "git push\n--force\norigin")
     }
 
     // MARK: §6.3 Rejoin
 
     @Test("Rejoins a word-boundary wrap with a single space (§5 case 1)")
     func rejoinSingleSpace() {
-        let lines = [
-            String(repeating: "x", count: 40) + " |",
-            "/tmp/out.json",
-        ]
+        // First line is full (width 42 == W) and ends in a normal character, not
+        // a continuation token, so the next line is rejoined with one space.
+        let head = String(repeating: "x", count: 42)
         let (out, _, _) = Repair.rejoin(
-            lines.joined(separator: "\n"),
+            head + "\n/tmp/out.json",
             profile: .claudeCode,
             options: .init(forcedWidth: 42)
         )
-        #expect(out == String(repeating: "x", count: 40) + " | /tmp/out.json")
+        #expect(out == head + " /tmp/out.json")
     }
 
     @Test("Leaves explicit `\\` continuations as separate lines (§5 case 6)")

@@ -30,10 +30,14 @@ Requires the Swift toolchain (Xcode Command Line Tools).
 
 ```sh
 make build      # swift build
-make test       # swift test
+make test       # swift test (+ swift-testing framework paths)
 make fmt        # format in place (needs swift-format)
 make lint       # static analysis (needs swiftlint)
 ```
+
+> Use `make test`, not bare `swift test`: on the standalone Command Line Tools
+> (no full Xcode) the swift-testing framework needs its search/runtime paths
+> passed explicitly, which the Makefile derives from `xcode-select -p`.
 
 Optional tools:
 
