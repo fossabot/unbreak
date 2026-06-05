@@ -64,6 +64,26 @@ public enum Signals {
         public var vetoes: Bool { markdownDominant || stackTrace || prose }
     }
 
+    // MARK: - Combined analysis (for the watch-mode gates, §7)
+
+    /// Both content classifications computed together — the bundle the watch-mode
+    /// gate (`WatchGate.decide`) consumes so the watcher derives signals once and
+    /// the discrete `passesGate` / `vetoes` booleans stay the source of truth.
+    public struct Analysis: Sendable, Equatable {
+        public let shell: Shell
+        public let structure: Structure
+
+        public init(shell: Shell, structure: Structure) {
+            self.shell = shell
+            self.structure = structure
+        }
+    }
+
+    /// Classify a fragment for the watch-mode gates 5/6 in one call.
+    public static func analyze(_ text: String) -> Analysis {
+        Analysis(shell: shell(text), structure: structure(text))
+    }
+
     public static func structure(_ text: String) -> Structure {
         let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         let nonBlank = lines.filter { !$0.allSatisfy { $0 == " " || $0 == "\t" } }

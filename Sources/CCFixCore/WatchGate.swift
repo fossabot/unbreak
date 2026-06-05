@@ -1,0 +1,253 @@
+import Foundation
+
+/// The pure watch-mode gate decision (PRD v2 §7).
+///
+/// Watch mode mutates the clipboard only when **all six** gates pass:
+///
+///  1. frontmost app is an allowlisted terminal,
+///  2. the clipboard item is plain text,
+///  3. the payload is within the size bound (`maxClipboardBytes`, default 16 KB),
+///  4. the repair changed the content,
+///  5. the shell-signal tier passes (≥1 strong OR ≥2 weak — §6.7 / `Signals.Shell.passesGate`),
+///  6. no structure-risk veto fires (markdown/stack-trace/prose — `Signals.Structure.vetoes`).
+///
+/// This function is **pure**: no `NSPasteboard`/`NSWorkspace` access lives here.
+/// The watcher plumbing (CLAU-bgouhgol) reads the frontmost bundle id and the
+/// plain-text representation, runs the pure repair (§6) and `Signals` (§6.7), then
+/// hands those values in. Keeping the decision pure makes the whole gate ladder
+/// unit-testable and lets dry-run / log-only mode (§7.2, §7.3) reuse the exact
+/// same logic without touching the clipboard.
+///
+/// All six gates are always evaluated (no short-circuit) so the returned
+/// `Decision` carries a full, content-safe per-gate breakdown for the log line.
+public enum WatchGate {
+    /// User-tunable gate configuration (PRD v2 §8.3). The terminal allowlist holds
+    /// bundle identifiers (e.g. `com.apple.Terminal`); `maxClipboardBytes` bounds
+    /// the UTF-8 payload size.
+    public struct Config: Sendable, Equatable {
+        public var terminalAllowlist: Set<String>
+        public var maxClipboardBytes: Int
+
+        /// Default bundle ids for the §7 allowlist: cmux, Ghostty, iTerm2, Apple
+        /// Terminal. User-extensible via config/env (§8.3).
+        public static let defaultTerminalAllowlist: Set<String> = [
+            "com.qvacua.cmux",  // cmux (presumed capture terminal, §11)
+            "dev.cmux.cmux",  // cmux (alternate bundle id)
+            "com.mitchellh.ghostty",  // Ghostty
+            "com.googlecode.iterm2",  // iTerm2
+            "com.apple.Terminal",  // Apple Terminal
+        ]
+
+        public init(
+            terminalAllowlist: Set<String> = Config.defaultTerminalAllowlist,
+            maxClipboardBytes: Int = 16 * 1024
+        ) {
+            self.terminalAllowlist = terminalAllowlist
+            self.maxClipboardBytes = maxClipboardBytes
+        }
+    }
+
+    /// The six gates of §7, in evaluation order. `rawValue` doubles as a stable,
+    /// content-safe log key.
+    public enum Gate: String, Sendable, CaseIterable {
+        case terminalAllowlisted = "terminal-allowlisted"  // §7.1
+        case plainText = "plain-text"  // §7.2
+        case sizeWithinBound = "size-within-bound"  // §7.3
+        case repairChangedContent = "repair-changed"  // §7.4
+        case shellSignal = "shell-signal"  // §7.5
+        case structureRiskClear = "structure-risk-clear"  // §7.6
+    }
+
+    /// A single gate's result with a short, content-safe explanation suitable for
+    /// `~/Library/Logs/ccfix.log` (§7.3 — full clipboard contents are never logged).
+    public struct GateOutcome: Sendable, Equatable {
+        public let gate: Gate
+        public let passed: Bool
+        public let detail: String
+
+        public init(gate: Gate, passed: Bool, detail: String) {
+            self.gate = gate
+            self.passed = passed
+            self.detail = detail
+        }
+    }
+
+    /// The full decision. `shouldMutate` is true iff every gate passed. The
+    /// `outcomes`, `byteCount`, and `lineCount` exist so dry-run / log-only mode
+    /// (§7.2) and the observability log (§7.3) can report what *would* happen and
+    /// why, without re-deriving anything.
+    public struct Decision: Sendable, Equatable {
+        public let shouldMutate: Bool
+        public let outcomes: [GateOutcome]
+        public let byteCount: Int
+        public let lineCount: Int
+
+        public init(shouldMutate: Bool, outcomes: [GateOutcome], byteCount: Int, lineCount: Int) {
+            self.shouldMutate = shouldMutate
+            self.outcomes = outcomes
+            self.byteCount = byteCount
+            self.lineCount = lineCount
+        }
+
+        /// The first gate that failed, or `nil` if all passed. Handy for a one-word
+        /// log reason ("blocked: structure-risk-clear").
+        public var blockingGate: Gate? {
+            outcomes.first { !$0.passed }?.gate
+        }
+
+        /// A compact, content-safe summary line for the log / dry-run output, e.g.
+        /// `decision=skip blocked=structure-risk-clear bytes=412 lines=6`.
+        public var logSummary: String {
+            let verdict = shouldMutate ? "mutate" : "skip"
+            let blocked = blockingGate.map { " blocked=\($0.rawValue)" } ?? ""
+            return "decision=\(verdict)\(blocked) bytes=\(byteCount) lines=\(lineCount)"
+        }
+    }
+
+    /// Decide whether watch mode should mutate the clipboard (§7).
+    ///
+    /// - Parameters:
+    ///   - clipboard: the already-read plain-text clipboard content (the original,
+    ///     pre-repair string the user copied). Used for the size bound (gate 3) and
+    ///     line count.
+    ///   - isPlainText: whether the pasteboard item is a plain-text (`public.utf8-plain-text`)
+    ///     representation. Non-string / rich items are left untouched (gate 2, §7.2);
+    ///     the plumbing determines this from the pasteboard types.
+    ///   - frontmostBundleID: bundle id of the frontmost app, or `nil` if unknown
+    ///     (gate 1, §7.1).
+    ///   - report: the `RepairReport` from the pure repair — `changed` drives gate 4.
+    ///   - analysis: `Signals.analyze(...)` for the content — `shell.passesGate`
+    ///     drives gate 5, `structure.vetoes` drives gate 6.
+    ///   - config: the allowlist and size bound (§8.3).
+    public static func decide(
+        clipboard: String,
+        isPlainText: Bool,
+        frontmostBundleID: String?,
+        report: RepairReport,
+        analysis: Signals.Analysis,
+        config: Config = .init()
+    ) -> Decision {
+        let byteCount = clipboard.utf8.count
+        // Line count is informational (for the log); a trailing newline does not add
+        // a phantom line.
+        let lineCount =
+            clipboard.isEmpty
+            ? 0 : clipboard.split(separator: "\n", omittingEmptySubsequences: false).count
+
+        let outcomes: [GateOutcome] = [
+            terminalGate(frontmostBundleID, config: config),  // §7.1
+            plainTextGate(isPlainText),  // §7.2
+            sizeGate(byteCount: byteCount, config: config),  // §7.3
+            changedGate(report),  // §7.4
+            shellGate(analysis.shell),  // §7.5
+            structureGate(analysis.structure),  // §7.6
+        ]
+
+        return Decision(
+            shouldMutate: outcomes.allSatisfy { $0.passed },
+            outcomes: outcomes,
+            byteCount: byteCount,
+            lineCount: lineCount
+        )
+    }
+
+    /// Convenience overload that derives the §6.7 signals from the clipboard content
+    /// itself — the common watcher path, where signals are judged on the copied
+    /// (original) string. Tests and power users that pre-compute signals on a
+    /// different string can call the primary overload with their own `Analysis`.
+    public static func decide(
+        clipboard: String,
+        isPlainText: Bool,
+        frontmostBundleID: String?,
+        report: RepairReport,
+        config: Config = .init()
+    ) -> Decision {
+        decide(
+            clipboard: clipboard,
+            isPlainText: isPlainText,
+            frontmostBundleID: frontmostBundleID,
+            report: report,
+            analysis: Signals.analyze(clipboard),
+            config: config
+        )
+    }
+
+    // MARK: - Per-gate evaluation
+
+    /// Gate 1 — frontmost app is an allowlisted terminal (§7.1).
+    private static func terminalGate(_ bundleID: String?, config: Config) -> GateOutcome {
+        guard let bundleID else {
+            return GateOutcome(
+                gate: .terminalAllowlisted,
+                passed: false,
+                detail: "no frontmost app"
+            )
+        }
+        let allowed = config.terminalAllowlist.contains(bundleID)
+        return GateOutcome(
+            gate: .terminalAllowlisted,
+            passed: allowed,
+            detail: allowed
+                ? "frontmost \(bundleID) is allowlisted"
+                : "frontmost \(bundleID) not in allowlist"
+        )
+    }
+
+    /// Gate 2 — clipboard item is plain text (§7.2).
+    private static func plainTextGate(_ isPlainText: Bool) -> GateOutcome {
+        GateOutcome(
+            gate: .plainText,
+            passed: isPlainText,
+            detail: isPlainText ? "plain text" : "non-string / rich item — untouched"
+        )
+    }
+
+    /// Gate 3 — size bound (§7.3).
+    private static func sizeGate(byteCount: Int, config: Config) -> GateOutcome {
+        let withinBound = byteCount <= config.maxClipboardBytes
+        return GateOutcome(
+            gate: .sizeWithinBound,
+            passed: withinBound,
+            detail: "\(byteCount) B " + (withinBound ? "≤ " : "> ")
+                + "\(config.maxClipboardBytes) B bound"
+        )
+    }
+
+    /// Gate 4 — the repair changed the content (§7.4).
+    private static func changedGate(_ report: RepairReport) -> GateOutcome {
+        GateOutcome(
+            gate: .repairChangedContent,
+            passed: report.changed,
+            detail: report.changed ? "repair changed content" : "no change"
+        )
+    }
+
+    /// Gate 5 — high-confidence shell signal, discrete tiers (§7.5 / §6.7).
+    private static func shellGate(_ shell: Signals.Shell) -> GateOutcome {
+        GateOutcome(
+            gate: .shellSignal,
+            passed: shell.passesGate,
+            detail: "shell signals: \(shell.strongCount) strong / \(shell.weakCount) weak"
+                + (shell.passesGate ? " → pass" : " → fail (need ≥1 strong or ≥2 weak)")
+        )
+    }
+
+    /// Gate 6 — structure-risk veto (§7.6). Passes when nothing vetoes.
+    private static func structureGate(_ structure: Signals.Structure) -> GateOutcome {
+        let clear = !structure.vetoes
+        return GateOutcome(
+            gate: .structureRiskClear,
+            passed: clear,
+            detail: clear ? "no structure-risk veto" : "veto: \(structureVetoReason(structure))"
+        )
+    }
+
+    /// Which structure pattern(s) fired the veto, for the log detail (§7.6).
+    private static func structureVetoReason(_ structure: Signals.Structure) -> String {
+        var reasons: [String] = []
+        if structure.markdownDominant { reasons.append("markdown") }
+        if structure.stackTrace { reasons.append("stack-trace") }
+        if structure.prose { reasons.append("prose") }
+        return reasons.isEmpty ? "unknown" : reasons.joined(separator: "+")
+    }
+}
