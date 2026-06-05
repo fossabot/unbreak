@@ -7,8 +7,10 @@ import Foundation
 /// terminal actually renders, so the repair pipeline must never use them for
 /// column comparisons.
 ///
-/// TODO(§6.1): grapheme-cluster awareness for emoji-ZWJ sequences and full
-/// East-Asian-Width tables; this is a conservative first pass.
+/// Width is measured per **extended grapheme cluster** (`Character`), not per
+/// scalar, so emoji-ZWJ sequences (👨‍👩‍👧), regional-indicator flags (🇯🇵), and
+/// emoji + variation-selector (❤️) each render as a single 2-cell glyph rather
+/// than summing their components.
 public enum DisplayWidth {
     public static let defaultTabWidth = 8
 
@@ -45,14 +47,36 @@ public enum DisplayWidth {
         }
     }
 
-    /// Display width of a substring, expanding tabs to the next tab stop.
+    /// Regional-indicator pair (a flag) or any default-emoji-presentation scalar
+    /// makes its grapheme cluster occupy two cells, even when the base scalar
+    /// sits outside `isWide`'s ranges.
+    static func isEmojiWide(_ scalar: Unicode.Scalar) -> Bool {
+        if (0x1F1E6...0x1F1FF).contains(scalar.value) { return true } // 🇦…🇿 flags
+        return scalar.properties.isEmojiPresentation
+    }
+
+    /// Width of one extended grapheme cluster. Tabs are handled by the caller
+    /// (they need the running column), so a tab never reaches here.
+    static func width(of cluster: Character) -> Int {
+        let scalars = cluster.unicodeScalars
+        // A VS16 (U+FE0F) forces emoji presentation → a 2-cell glyph.
+        if scalars.contains(where: { $0.value == 0xFE0F }) { return 2 }
+        if scalars.contains(where: { isWide($0) || isEmojiWide($0) }) { return 2 }
+        // Otherwise the cluster renders as its base scalar; trailing combining
+        // marks contribute zero (handled by the scalar-level width).
+        guard let base = scalars.first else { return 0 }
+        return width(of: base)
+    }
+
+    /// Display width of a substring, expanding tabs to the next tab stop and
+    /// measuring every other glyph per grapheme cluster.
     public static func width(of string: Substring, tabWidth: Int = defaultTabWidth) -> Int {
         var col = 0
-        for scalar in string.unicodeScalars {
-            if scalar == "\t" {
+        for ch in string {
+            if ch == "\t" {
                 col += tabWidth - (col % tabWidth)
             } else {
-                col += width(of: scalar)
+                col += width(of: ch)
             }
         }
         return col
