@@ -14,5 +14,8 @@ line_length:
 identifier_name:
   min_length: 1   # single-letter locals (g, w, l, r) are fine in width math
 
+trailing_comma:
+  mandatory_comma: true   # match swift-format, which keeps trailing commas in multiline collections
+
 disabled_rules:
   - todo          # PRD section TODOs are intentional placeholders

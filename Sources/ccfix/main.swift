@@ -70,7 +70,8 @@ func writeClipboard(_ value: String) {
 
 let input: String
 if readStdin {
-    input = String(decoding: FileHandle.standardInput.readDataToEndOfFile(), as: UTF8.self)
+    let data = FileHandle.standardInput.readDataToEndOfFile()
+    input = String(bytes: data, encoding: .utf8) ?? ""
 } else if let literal {
     input = literal
 } else {

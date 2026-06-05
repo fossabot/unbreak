@@ -19,19 +19,18 @@ public enum Repair {
     ) -> RepairResult {
         let normalized = normalize(input)
         let (dedented, dedentChanged) = degutter(normalized, tabWidth: profile.tabWidth)
-        let (rejoined, wrapConfidence, detectedWidth) =
-            rejoin(dedented, profile: profile, options: options)
+        let rejoined = rejoin(dedented, profile: profile, options: options)
 
         let report = RepairReport(
-            changed: rejoined != input,
+            changed: rejoined.text != input,
             dedentChanged: dedentChanged,
-            wrapColumnConfidence: wrapConfidence,
+            wrapColumnConfidence: rejoined.confidence,
             shellSignalScore: 0,  // TODO(§7 gate 5): discrete tier scoring
             structureRisk: 0,  // TODO(§7 gate 6): structure-risk veto
             heredocDetected: false,  // TODO(§6.4)
-            detectedWidth: detectedWidth
+            detectedWidth: rejoined.detectedWidth
         )
-        return RepairResult(text: rejoined, report: report)
+        return RepairResult(text: rejoined.text, report: report)
     }
 
     // MARK: - §6.1 Normalize
@@ -77,11 +76,10 @@ public enum Repair {
                 i += 2
                 while i < scalars.count {
                     if scalars[i].value == bel { i += 1; break }
-                    if scalars[i].value == esc, i + 1 < scalars.count, scalars[i + 1].value == 0x5C
-                    {
-                        i += 2
-                        break
-                    }
+                    let isST =
+                        scalars[i].value == esc && i + 1 < scalars.count
+                        && scalars[i + 1].value == 0x5C
+                    if isST { i += 2; break }
                     i += 1
                 }
             } else {  // any other two-byte ESC sequence
@@ -122,18 +120,29 @@ public enum Repair {
 
     // MARK: - §6.3 Rejoin wrapped lines
 
+    /// Result of the rejoin pass: the rewritten text plus the wrap-column signals
+    /// that flow into the `RepairReport` (§6.7).
+    struct RejoinResult {
+        let text: String
+        let confidence: Double
+        let detectedWidth: Int?
+    }
+
     static func rejoin(
         _ text: String,
         profile: WrapProfile,
         options: RepairOptions
-    ) -> (String, Double, Int?) {
+    ) -> RejoinResult {
         let lines = splitLines(text)
-        guard lines.count >= 2 else { return (text, 0, nil) }
+        guard lines.count >= 2 else {
+            return RejoinResult(text: text, confidence: 0, detectedWidth: nil)
+        }
 
         let widths = lines.map { DisplayWidth.width(of: $0, tabWidth: profile.tabWidth) }
         let detected = options.forcedWidth ?? detectWidth(widths)
         guard let w = detected else {
-            return (options.joinAll ? lines.joined(separator: " ") : text, 0, nil)
+            let joined = options.joinAll ? lines.joined(separator: " ") : text
+            return RejoinResult(text: joined, confidence: 0, detectedWidth: nil)
         }
 
         var out: [String] = []
@@ -165,7 +174,11 @@ public enum Repair {
         }
 
         let confidence = joins > 0 ? min(1.0, 0.5 + 0.1 * Double(joins)) : 0
-        return (out.joined(separator: "\n"), confidence, w)
+        return RejoinResult(
+            text: out.joined(separator: "\n"),
+            confidence: confidence,
+            detectedWidth: w
+        )
     }
 
     /// Wrap column = the most common repeated display width among non-final lines

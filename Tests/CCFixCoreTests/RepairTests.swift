@@ -66,23 +66,23 @@ struct RepairTests {
         // First line is full (width 42 == W) and ends in a normal character, not
         // a continuation token, so the next line is rejoined with one space.
         let head = String(repeating: "x", count: 42)
-        let (out, _, _) = Repair.rejoin(
+        let result = Repair.rejoin(
             head + "\n/tmp/out.json",
             profile: .claudeCode,
             options: .init(forcedWidth: 42)
         )
-        #expect(out == head + " /tmp/out.json")
+        #expect(result.text == head + " /tmp/out.json")
     }
 
     @Test("Leaves explicit `\\` continuations as separate lines (§5 case 6)")
     func preservesBackslashContinuation() {
         let input = String(repeating: "y", count: 42) + " \\\nnext line"
-        let (out, _, _) = Repair.rejoin(
+        let result = Repair.rejoin(
             input,
             profile: .claudeCode,
             options: .init(forcedWidth: 44)
         )
-        #expect(out == input)
+        #expect(result.text == input)
     }
 
     // MARK: §6.8 Guarantees
