@@ -10,17 +10,21 @@ public struct WrapProfile: Sendable {
     public var tabWidth: Int
     /// Minimum wrap-column confidence before rejoin is attempted (§6.3).
     public var minWrapConfidence: Double
+    /// Minimum run of spaces that can mark a merge artifact's hidden newline (§6.5).
+    public var minPaddingRun: Int
 
     public init(
         name: String,
         continuationTokens: [String],
         tabWidth: Int = DisplayWidth.defaultTabWidth,
-        minWrapConfidence: Double = 0.5
+        minWrapConfidence: Double = 0.5,
+        minPaddingRun: Int = 3
     ) {
         self.name = name
         self.continuationTokens = continuationTokens
         self.tabWidth = tabWidth
         self.minWrapConfidence = minWrapConfidence
+        self.minPaddingRun = minPaddingRun
     }
 
     public static let claudeCode = WrapProfile(

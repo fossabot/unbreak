@@ -33,6 +33,17 @@ public enum Repair {
             protected: heredoc.protectedLines
         )
 
+        // §6.5: optional, lossy merge-artifact split — off unless the caller opts
+        // in. Runs after rejoin (it works on the over-long lines rejoin leaves) and
+        // skips heredoc bodies.
+        var finalText = rejoined.text
+        if options.splitPaddingArtifacts {
+            // A forced width applies even when rejoin saw a single line (and so
+            // reported no detected column).
+            let splitWidth = options.forcedWidth ?? rejoined.detectedWidth
+            finalText = MergeSplit.split(finalText, profile: profile, width: splitWidth).text
+        }
+
         // §6.7: classify the normalized content for the watch-mode gates. Signals
         // describe what the user copied (the gate-5/6 subject), so they read the
         // normalized input rather than the rewritten output.
@@ -40,7 +51,7 @@ public enum Repair {
         let structure = Signals.structure(normalized)
 
         let report = RepairReport(
-            changed: rejoined.text != input,
+            changed: finalText != input,
             dedentChanged: dedentChanged,
             wrapColumnConfidence: rejoined.confidence,
             shellSignalScore: shell.score,
@@ -48,7 +59,7 @@ public enum Repair {
             heredocDetected: heredoc.detected,
             detectedWidth: rejoined.detectedWidth
         )
-        return RepairResult(text: rejoined.text, report: report)
+        return RepairResult(text: finalText, report: report)
     }
 
     // MARK: - §6.1 Normalize
