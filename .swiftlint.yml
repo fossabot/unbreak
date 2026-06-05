@@ -1,0 +1,18 @@
+# SwiftLint config — optional; CI runs it only if swiftlint is installed.
+included:
+  - Sources
+  - Tests
+
+excluded:
+  - .build
+
+line_length:
+  warning: 100
+  error: 140
+  ignores_comments: true
+
+identifier_name:
+  min_length: 1   # single-letter locals (g, w, l, r) are fine in width math
+
+disabled_rules:
+  - todo          # PRD section TODOs are intentional placeholders

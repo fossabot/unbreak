@@ -1,0 +1,170 @@
+import Foundation
+
+/// The pure, deterministic repair pipeline (PRD v2 §6):
+///
+///   normalize → dedent → rejoin → render → (String, RepairReport)
+///
+/// No I/O, no globals, no clipboard access. The CLI and the watcher both call
+/// `repair(_:profile:options:)` and decide what to do from the returned report.
+///
+/// Implemented so far: §6.1 normalize (CRLF/CR), §6.2 de-gutter, §6.3 rejoin.
+/// TODO: §6.1 ANSI/OSC stripping, §6.4 heredoc protection, §6.5 merge-split,
+/// §6.6 non-Claude profiles, §6.7 full confidence scoring.
+public enum Repair {
+    public static func repair(
+        _ input: String,
+        profile: WrapProfile = .claudeCode,
+        options: RepairOptions = .init()
+    ) -> RepairResult {
+        let normalized = normalize(input)
+        let (dedented, dedentChanged) = degutter(normalized, tabWidth: profile.tabWidth)
+        let (rejoined, wrapConfidence, detectedWidth) =
+            rejoin(dedented, profile: profile, options: options)
+
+        let report = RepairReport(
+            changed: rejoined != input,
+            dedentChanged: dedentChanged,
+            wrapColumnConfidence: wrapConfidence,
+            shellSignalScore: 0,   // TODO(§7 gate 5): discrete tier scoring
+            structureRisk: 0,      // TODO(§7 gate 6): structure-risk veto
+            heredocDetected: false, // TODO(§6.4)
+            detectedWidth: detectedWidth
+        )
+        return RepairResult(text: rejoined, report: report)
+    }
+
+    // MARK: - §6.1 Normalize
+
+    static func normalize(_ input: String) -> String {
+        var s = input.replacingOccurrences(of: "\r\n", with: "\n")
+        s = s.replacingOccurrences(of: "\r", with: "\n")
+        return s
+    }
+
+    // MARK: - §6.2 De-gutter (dedent, robust to a partially selected line 1)
+
+    static func degutter(_ text: String, tabWidth: Int) -> (String, Bool) {
+        let lines = splitLines(text)
+        guard lines.count >= 2 else { return (text, false) }
+
+        // Gutter `G` = minimum leading width over non-blank lines 2..n.
+        let tail = lines.dropFirst()
+        let indents = tail
+            .filter { !isBlank($0) }
+            .map { DisplayWidth.leadingWidth(of: $0, tabWidth: tabWidth) }
+        guard let g = indents.min(), g > 0 else { return (text, false) }
+
+        var out: [String] = []
+        out.reserveCapacity(lines.count)
+        for (idx, line) in lines.enumerated() {
+            if idx == 0 {
+                let firstIndent = DisplayWidth.leadingWidth(of: line, tabWidth: tabWidth)
+                out.append(removeLeadingColumns(line, upTo: min(firstIndent, g), tabWidth: tabWidth))
+            } else {
+                out.append(removeLeadingColumns(line, upTo: g, tabWidth: tabWidth))
+            }
+        }
+        return (out.joined(separator: "\n"), true)
+    }
+
+    // MARK: - §6.3 Rejoin wrapped lines
+
+    static func rejoin(
+        _ text: String,
+        profile: WrapProfile,
+        options: RepairOptions
+    ) -> (String, Double, Int?) {
+        let lines = splitLines(text)
+        guard lines.count >= 2 else { return (text, 0, nil) }
+
+        let widths = lines.map { DisplayWidth.width(of: $0, tabWidth: profile.tabWidth) }
+        let detected = options.forcedWidth ?? detectWidth(widths)
+        guard let w = detected else {
+            return (options.joinAll ? lines.joined(separator: " ") : text, 0, nil)
+        }
+
+        var out: [String] = []
+        var joins = 0
+        var i = 0
+        while i < lines.count {
+            var current = lines[i]
+            // A newline after line `i` is a wrap when line `i` is "full" and does
+            // not end in an explicit continuation token. Decisions key off the
+            // *original* line `i`, so a run of full lines collapses correctly and
+            // the operation stays idempotent.
+            while i < lines.count - 1 {
+                let lineWidth = widths[i]
+                let isFull = lineWidth >= w - 2 && lineWidth <= w
+                let endsContinuation = profile.continuationTokens.contains {
+                    lines[i].hasSuffix($0)
+                }
+                let nextNonBlank = !isBlank(lines[i + 1])
+                if options.joinAll || (isFull && !endsContinuation && nextNonBlank) {
+                    current = joinSeam(current, lines[i + 1])
+                    joins += 1
+                    i += 1
+                } else {
+                    break
+                }
+            }
+            out.append(current)
+            i += 1
+        }
+
+        let confidence = joins > 0 ? min(1.0, 0.5 + 0.1 * Double(joins)) : 0
+        return (out.joined(separator: "\n"), confidence, w)
+    }
+
+    /// Wrap column = the most common repeated display width among non-final lines
+    /// wide enough to plausibly be a wrap point. Returns nil when no such column
+    /// dominates, which keeps clean input unchanged (§6.8).
+    static func detectWidth(_ widths: [Int]) -> Int? {
+        let candidates = widths.dropLast().filter { $0 >= 20 }
+        guard candidates.count >= 2 else { return nil }
+        var counts: [Int: Int] = [:]
+        for value in candidates { counts[value, default: 0] += 1 }
+        guard let best = counts.max(by: { $0.value < $1.value }), best.value >= 2 else {
+            return nil
+        }
+        return best.key
+    }
+
+    // MARK: - Helpers
+
+    static func splitLines(_ text: String) -> [String] {
+        text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+    }
+
+    static func isBlank(_ line: String) -> Bool {
+        line.allSatisfy { $0 == " " || $0 == "\t" }
+    }
+
+    /// Join a word-boundary wrap with exactly one space, collapsing the accidental
+    /// double space at the seam (the old tool's `>  /tmp` bug — §5 note).
+    static func joinSeam(_ left: String, _ right: String) -> String {
+        var l = Substring(left)
+        while l.hasSuffix(" ") { l = l.dropLast() }
+        var r = Substring(right)
+        while r.hasPrefix(" ") { r = r.dropFirst() }
+        return String(l) + " " + String(r)
+    }
+
+    /// Remove up to `columns` of leading whitespace (display-width aware).
+    static func removeLeadingColumns(_ line: String, upTo columns: Int, tabWidth: Int) -> String {
+        guard columns > 0 else { return line }
+        var removed = 0
+        var idx = line.startIndex
+        while idx < line.endIndex, removed < columns {
+            let ch = line[idx]
+            if ch == " " {
+                removed += 1
+            } else if ch == "\t" {
+                removed += tabWidth - (removed % tabWidth)
+            } else {
+                break
+            }
+            idx = line.index(after: idx)
+        }
+        return String(line[idx...])
+    }
+}

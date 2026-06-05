@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show Swift version
+        run: swift --version
+
+      - name: Build
+        run: swift build -v
+
+      - name: Test
+        run: swift test -v
+
+      - name: Format check
+        run: |
+          if command -v swift-format >/dev/null 2>&1; then
+            swift-format lint --recursive --strict Sources Tests Package.swift
+          else
+            echo "swift-format not available on runner; skipping"
+          fi
