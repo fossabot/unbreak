@@ -33,12 +33,18 @@ public enum Repair {
             protected: heredoc.protectedLines
         )
 
+        // §6.7: classify the normalized content for the watch-mode gates. Signals
+        // describe what the user copied (the gate-5/6 subject), so they read the
+        // normalized input rather than the rewritten output.
+        let shell = Signals.shell(normalized)
+        let structure = Signals.structure(normalized)
+
         let report = RepairReport(
             changed: rejoined.text != input,
             dedentChanged: dedentChanged,
             wrapColumnConfidence: rejoined.confidence,
-            shellSignalScore: 0,  // TODO(§7 gate 5): discrete tier scoring
-            structureRisk: 0,  // TODO(§7 gate 6): structure-risk veto
+            shellSignalScore: shell.score,
+            structureRisk: structure.risk,
             heredocDetected: heredoc.detected,
             detectedWidth: rejoined.detectedWidth
         )
