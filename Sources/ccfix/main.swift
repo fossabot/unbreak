@@ -1,5 +1,6 @@
 import CCFixCore
 import Foundation
+
 #if canImport(AppKit)
 import AppKit
 #endif
@@ -8,18 +9,18 @@ import AppKit
 // management, and watch mode (§7, §8.2) are not wired up yet.
 
 let helpText = """
-ccfix — repair terminal-wrapped clipboard commands (PRD v2 §8.1)
+    ccfix — repair terminal-wrapped clipboard commands (PRD v2 §8.1)
 
-USAGE:
-  ccfix                       fix clipboard in place (default)
-  ccfix "text"                fix an argument, write result to clipboard
-  ccfix -                     stdin -> stdout (never touches clipboard)
-  ccfix --no-copy             print result, do not write clipboard (preview)
-  ccfix --join-all            aggressive full-collapse fallback
-  ccfix --width N             force the wrap column
-  ccfix --split-padding-artifacts
-                              enable the lossy merge-artifact split (§6.5)
-"""
+    USAGE:
+      ccfix                       fix clipboard in place (default)
+      ccfix "text"                fix an argument, write result to clipboard
+      ccfix -                     stdin -> stdout (never touches clipboard)
+      ccfix --no-copy             print result, do not write clipboard (preview)
+      ccfix --join-all            aggressive full-collapse fallback
+      ccfix --width N             force the wrap column
+      ccfix --split-padding-artifacts
+                                  enable the lossy merge-artifact split (§6.5)
+    """
 
 var options = RepairOptions()
 var noCopy = false
@@ -52,19 +53,19 @@ while i < args.count {
 }
 
 func clipboardString() -> String? {
-#if canImport(AppKit)
+    #if canImport(AppKit)
     NSPasteboard.general.string(forType: .string)
-#else
+    #else
     nil
-#endif
+    #endif
 }
 
 func writeClipboard(_ value: String) {
-#if canImport(AppKit)
+    #if canImport(AppKit)
     let pasteboard = NSPasteboard.general
     pasteboard.clearContents()
     pasteboard.setString(value, forType: .string)
-#endif
+    #endif
 }
 
 let input: String

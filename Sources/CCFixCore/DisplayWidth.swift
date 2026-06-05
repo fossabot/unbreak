@@ -18,10 +18,10 @@ public enum DisplayWidth {
     /// 2 for wide CJK/emoji, 1 otherwise).
     static func width(of scalar: Unicode.Scalar) -> Int {
         switch scalar.value {
-        case 0x0300...0x036F, // combining diacritical marks
-             0x200B...0x200F, // zero-width space / joiners / marks
-             0xFE00...0xFE0F, // variation selectors
-             0xFEFF:          // zero-width no-break space / BOM
+        case 0x0300...0x036F,  // combining diacritical marks
+            0x200B...0x200F,  // zero-width space / joiners / marks
+            0xFE00...0xFE0F,  // variation selectors
+            0xFEFF:  // zero-width no-break space / BOM
             return 0
         default:
             break
@@ -32,15 +32,15 @@ public enum DisplayWidth {
 
     static func isWide(_ scalar: Unicode.Scalar) -> Bool {
         switch scalar.value {
-        case 0x1100...0x115F,    // Hangul Jamo
-             0x2E80...0xA4CF,    // CJK radicals … Yi
-             0xAC00...0xD7A3,    // Hangul syllables
-             0xF900...0xFAFF,    // CJK compatibility ideographs
-             0xFE30...0xFE4F,    // CJK compatibility forms
-             0xFF00...0xFF60,    // fullwidth forms
-             0xFFE0...0xFFE6,    // fullwidth signs
-             0x1F300...0x1FAFF,  // emoji & pictographs
-             0x20000...0x3FFFD:  // CJK extension B+
+        case 0x1100...0x115F,  // Hangul Jamo
+            0x2E80...0xA4CF,  // CJK radicals … Yi
+            0xAC00...0xD7A3,  // Hangul syllables
+            0xF900...0xFAFF,  // CJK compatibility ideographs
+            0xFE30...0xFE4F,  // CJK compatibility forms
+            0xFF00...0xFF60,  // fullwidth forms
+            0xFFE0...0xFFE6,  // fullwidth signs
+            0x1F300...0x1FAFF,  // emoji & pictographs
+            0x20000...0x3FFFD:  // CJK extension B+
             return true
         default:
             return false
@@ -51,7 +51,7 @@ public enum DisplayWidth {
     /// makes its grapheme cluster occupy two cells, even when the base scalar
     /// sits outside `isWide`'s ranges.
     static func isEmojiWide(_ scalar: Unicode.Scalar) -> Bool {
-        if (0x1F1E6...0x1F1FF).contains(scalar.value) { return true } // 🇦…🇿 flags
+        if (0x1F1E6...0x1F1FF).contains(scalar.value) { return true }  // 🇦…🇿 flags
         return scalar.properties.isEmojiPresentation
     }
 

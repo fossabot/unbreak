@@ -26,9 +26,9 @@ public enum Repair {
             changed: rejoined != input,
             dedentChanged: dedentChanged,
             wrapColumnConfidence: wrapConfidence,
-            shellSignalScore: 0,   // TODO(§7 gate 5): discrete tier scoring
-            structureRisk: 0,      // TODO(§7 gate 6): structure-risk veto
-            heredocDetected: false, // TODO(§6.4)
+            shellSignalScore: 0,  // TODO(§7 gate 5): discrete tier scoring
+            structureRisk: 0,  // TODO(§7 gate 6): structure-risk veto
+            heredocDetected: false,  // TODO(§6.4)
             detectedWidth: detectedWidth
         )
         return RepairResult(text: rejoined, report: report)
@@ -69,21 +69,22 @@ public enum Repair {
                 continue
             }
             let next = scalars[i + 1].value
-            if next == 0x5B { // '[' — CSI: params/intermediates then a final byte 0x40–0x7E
+            if next == 0x5B {  // '[' — CSI: params/intermediates then a final byte 0x40–0x7E
                 i += 2
                 while i < scalars.count, !(0x40...0x7E).contains(scalars[i].value) { i += 1 }
-                if i < scalars.count { i += 1 } // consume the final byte
-            } else if next == 0x5D { // ']' — OSC: until BEL or ST (ESC '\')
+                if i < scalars.count { i += 1 }  // consume the final byte
+            } else if next == 0x5D {  // ']' — OSC: until BEL or ST (ESC '\')
                 i += 2
                 while i < scalars.count {
                     if scalars[i].value == bel { i += 1; break }
-                    if scalars[i].value == esc, i + 1 < scalars.count, scalars[i + 1].value == 0x5C {
+                    if scalars[i].value == esc, i + 1 < scalars.count, scalars[i + 1].value == 0x5C
+                    {
                         i += 2
                         break
                     }
                     i += 1
                 }
-            } else { // any other two-byte ESC sequence
+            } else {  // any other two-byte ESC sequence
                 i += 2
             }
         }
@@ -98,7 +99,8 @@ public enum Repair {
 
         // Gutter `G` = minimum leading width over non-blank lines 2..n.
         let tail = lines.dropFirst()
-        let indents = tail
+        let indents =
+            tail
             .filter { !isBlank($0) }
             .map { DisplayWidth.leadingWidth(of: $0, tabWidth: tabWidth) }
         guard let g = indents.min(), g > 0 else { return (text, false) }
@@ -108,7 +110,9 @@ public enum Repair {
         for (idx, line) in lines.enumerated() {
             if idx == 0 {
                 let firstIndent = DisplayWidth.leadingWidth(of: line, tabWidth: tabWidth)
-                out.append(removeLeadingColumns(line, upTo: min(firstIndent, g), tabWidth: tabWidth))
+                out.append(
+                    removeLeadingColumns(line, upTo: min(firstIndent, g), tabWidth: tabWidth)
+                )
             } else {
                 out.append(removeLeadingColumns(line, upTo: g, tabWidth: tabWidth))
             }

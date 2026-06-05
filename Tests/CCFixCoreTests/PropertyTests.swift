@@ -1,4 +1,5 @@
 import Testing
+
 @testable import CCFixCore
 
 /// Lightweight property tests (PRD v2 §6.8, §13) — no external dependency, to

@@ -1,4 +1,5 @@
 import Testing
+
 @testable import CCFixCore
 
 @Suite("Display-cell width (PRD v2 §6.1, §13)")
