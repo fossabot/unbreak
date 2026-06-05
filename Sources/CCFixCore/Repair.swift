@@ -253,14 +253,23 @@ public enum Repair {
     /// Wrap column = the most common repeated display width among non-final lines
     /// wide enough to plausibly be a wrap point. Returns nil when no such column
     /// dominates, which keeps clean input unchanged (§6.8).
+    ///
+    /// The tie-break is deterministic and **must stay that way**: `Dictionary`
+    /// iteration order is randomized per process by Swift's hash seed, so a bare
+    /// `max(by: value)` would pick a different width across runs whenever two widths
+    /// share the top count — making `repair` non-idempotent at random (§6.8). On a
+    /// count tie we pick the **larger** width: it admits fewer lines as "full", so
+    /// fewer speculative rejoins fire ("when in doubt, don't act", §7).
     static func detectWidth(_ widths: [Int]) -> Int? {
         let candidates = widths.dropLast().filter { $0 >= 20 }
         guard candidates.count >= 2 else { return nil }
         var counts: [Int: Int] = [:]
         for value in candidates { counts[value, default: 0] += 1 }
-        guard let best = counts.max(by: { $0.value < $1.value }), best.value >= 2 else {
-            return nil
+        // Order by count, then by width as a stable tie-break (largest wins).
+        let best = counts.max { lhs, rhs in
+            lhs.value != rhs.value ? lhs.value < rhs.value : lhs.key < rhs.key
         }
+        guard let best, best.value >= 2 else { return nil }
         return best.key
     }
 

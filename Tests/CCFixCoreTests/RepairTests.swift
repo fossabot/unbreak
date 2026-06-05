@@ -152,4 +152,33 @@ struct RepairTests {
         let twice = Repair.repair(once, options: .init(forcedWidth: 42)).text
         #expect(once == twice)
     }
+
+    @Test("Wrap-width detection breaks count ties deterministically (largest width)")
+    func detectWidthTieBreak() {
+        // Two widths share the top count (2 each). The detected column must be a
+        // pure function of the input, not of per-process Dictionary order — pick
+        // the larger width. (Regression: this tie made repair flakily non-idempotent
+        // across process launches, §6.8.)
+        #expect(Repair.detectWidth([100, 100, 45, 45, 17]) == 100)
+        #expect(Repair.detectWidth([45, 45, 100, 100, 17]) == 100)
+        // Same multiset, different order → same answer.
+        #expect(Repair.detectWidth([30, 70, 70, 30]) == 70)
+    }
+
+    @Test("A count tie does not make repair flaky across runs (§6.8)")
+    func tiedWidthsAreIdempotent() {
+        // Mirrors the seed-436 fuzz case: two long unbreakable URL-like lines tie
+        // with two shorter full lines. Whatever column is chosen, it must be chosen
+        // the same way every time, so a second pass is a no-op.
+        let input = [
+            "https://example.com/" + String(repeating: "a", count: 80),
+            "https://example.com/" + String(repeating: "a", count: 80),
+            String(repeating: "y", count: 40) + " tail",
+            String(repeating: "y", count: 40) + " tail",
+            "heredoc body line",
+        ].joined(separator: "\n")
+        let once = Repair.repair(input).text
+        let twice = Repair.repair(once).text
+        #expect(once == twice)
+    }
 }
