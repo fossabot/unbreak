@@ -39,8 +39,7 @@ public enum WatchGate {
         /// Default bundle ids for the §7 allowlist: cmux, Ghostty, iTerm2, Apple
         /// Terminal. User-extensible via config/env (§8.3).
         public static let defaultTerminalAllowlist: Set<String> = [
-            "com.qvacua.cmux",  // cmux (presumed capture terminal, §11)
-            "dev.cmux.cmux",  // cmux (alternate bundle id)
+            "com.cmuxterm.app",  // cmux (confirmed bundle id via QA, §11)
             "com.mitchellh.ghostty",  // Ghostty
             "com.googlecode.iterm2",  // iTerm2
             "com.apple.Terminal",  // Apple Terminal

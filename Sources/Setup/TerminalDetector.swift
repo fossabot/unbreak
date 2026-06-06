@@ -28,8 +28,7 @@ public enum TerminalDetector {
     /// Display names for the bundle ids we ship in the default allowlist. A
     /// bundle id without an entry falls back to itself as its label.
     public static let knownNames: [String: String] = [
-        "com.qvacua.cmux": "cmux",
-        "dev.cmux.cmux": "cmux",
+        "com.cmuxterm.app": "cmux",
         "com.mitchellh.ghostty": "Ghostty",
         "com.googlecode.iterm2": "iTerm2",
         "com.apple.Terminal": "Apple Terminal",
