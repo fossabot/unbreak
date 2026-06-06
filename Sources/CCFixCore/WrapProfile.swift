@@ -34,7 +34,7 @@ public struct WrapProfile: Sendable {
 }
 
 /// One-shot CLI options (PRD v2 §8.1).
-public struct RepairOptions: Sendable {
+public struct RepairOptions: Sendable, Equatable {
     public var forcedWidth: Int?
     public var joinAll: Bool
     /// Lossy merge-artifact split — off by default (§6.5).

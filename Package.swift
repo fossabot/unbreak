@@ -18,10 +18,16 @@ let package = Package(
             name: "Watch",
             dependencies: ["CCFixCore", "Clipboard"]
         ),
-        // Thin CLI shell around CCFixCore (PRD v2 §8.1) + the watch daemon (§7).
+        // One-shot CLI surface: arg grammar + I/O driver, testable in isolation
+        // from a real terminal/NSPasteboard (PRD v2 §8.1).
+        .target(
+            name: "CLI",
+            dependencies: ["CCFixCore", "Clipboard"]
+        ),
+        // Thin executable shim around CLI (§8.1) + the watch daemon (§7).
         .executableTarget(
             name: "ccfix",
-            dependencies: ["CCFixCore", "Clipboard", "Watch"]
+            dependencies: ["CCFixCore", "Clipboard", "Watch", "CLI"]
         ),
         .testTarget(
             name: "CCFixCoreTests",
@@ -34,6 +40,10 @@ let package = Package(
         .testTarget(
             name: "WatchTests",
             dependencies: ["Watch", "Clipboard", "CCFixCore"]
+        ),
+        .testTarget(
+            name: "CLITests",
+            dependencies: ["CLI", "CCFixCore", "Clipboard"]
         ),
     ]
 )
