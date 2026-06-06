@@ -14,13 +14,38 @@ a left-margin gutter into long lines. Copying a wrapped shell command carries ha
 breaks and leading spaces, so pasting garbles or prematurely runs it. This tool
 repairs exactly the copied fragment. (Background: PRD v2 §1.)
 
+## Install
+
+Primary path is a Homebrew tap (builds from source — needs the Xcode Command Line
+Tools). Replace `OWNER` with the real handle once the tap repo exists (§9).
+
+```sh
+brew install OWNER/tap/ccfix
+```
+
+`brew install` only puts the `ccfix` CLI on your `PATH`. The clipboard watcher is
+**off until you opt in** — enable it at login with `brew services start ccfix`, or
+run the guided `ccfix setup`.
+
+No Homebrew? Use the fallback installer (builds from source the same way):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/OWNER/ccfix/main/install.sh | bash
+```
+
+See [`docs/RELEASING.md`](docs/RELEASING.md) for the tap setup and release flow.
+
 ## Layout
 
 ```
 Sources/CCFixCore   pure, deterministic repair pipeline (PRD v2 §6)
 Sources/ccfix       thin CLI shell (PRD v2 §8.1)
-Tests/              swift-testing unit + property tests (PRD v2 §6.8, §13)
-docs/               PRDs
+Sources/Watch       opt-in fix-on-copy daemon + gates (PRD v2 §7)
+Sources/Setup       setup wizard + per-user LaunchAgent (PRD v2 §8.2)
+Tests/              swift-testing unit + property + corpus tests (§6.8, §13)
+Formula/ccfix.rb    Homebrew formula (PRD v2 §9)
+install.sh          curl|bash fallback installer (PRD v2 §9)
+docs/               PRDs + release flow
 archive/            reference Python implementation + original plist/README
 ```
 
@@ -54,7 +79,11 @@ swift run ccfix --help
 
 ## Status
 
-Early scaffold. Implemented: normalize, de-gutter, and wrap-rejoin (PRD v2
-§6.1–6.3). Not yet wired: heredoc protection (§6.4), merge-artifact split (§6.5),
-non-Claude profiles (§6.6), the confidence/veto watcher gates (§7), and the setup
-wizard / LaunchAgent (§8.2). See the `TODO(§…)` markers in `Sources/CCFixCore`.
+Feature-complete for v1. The repair pipeline (normalize, de-gutter, wrap-rejoin,
+heredoc protection, opt-in merge-split — §6.1–6.5, §6.8), the six-gate watch-mode
+daemon with in-memory undo (§7), the CLI (§8.1), config + env overrides (§8.3), the
+setup wizard / LaunchAgent (§8.2), and distribution (§9) are all in place. The §13
+fixture corpus enforces zero watch-mode mutations on normal copies.
+
+Deferred to v2 (§12): Gemini CLI / Codex CLI wrap profiles (§6.6), bottles, and a
+homebrew-core submission.
