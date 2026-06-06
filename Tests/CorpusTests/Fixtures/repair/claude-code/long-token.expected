@@ -1,0 +1,1 @@
+curl -fsSL https://raw.githubusercontent.com/example/ccfix/main/scripts/very-long-installer-path/install.sh | bash

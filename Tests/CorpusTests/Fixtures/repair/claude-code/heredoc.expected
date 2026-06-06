@@ -1,0 +1,4 @@
+cat <<EOF > /tmp/note.txt
+  remember to bump the version and the sha256 in the formula before
+  tagging the release
+EOF

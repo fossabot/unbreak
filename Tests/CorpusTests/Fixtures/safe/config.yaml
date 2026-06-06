@@ -1,0 +1,10 @@
+watch:
+  enabled: true
+  terminals:
+    - com.apple.Terminal
+    - com.googlecode.iterm2
+    - com.mitchellh.ghostty
+  max_clipboard_bytes: 16384
+repair:
+  profile: claude-code
+  split_padding_artifacts: false

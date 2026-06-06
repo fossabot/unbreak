@@ -81,7 +81,11 @@ public enum Repair {
             shellSignalScore: shell.score,
             structureRisk: structure.risk,
             heredocDetected: heredocDetected,
-            detectedWidth: firstWidth
+            detectedWidth: firstWidth,
+            // Beyond normalization? If the output equals the normalized input, the
+            // only change was §6.1 stripping (escapes/CRLF) — no wrap rejoined, no
+            // gutter removed. Watch mode (§7.4) must not fire on that.
+            structuralChange: finalText != normalized
         )
         return RepairResult(text: finalText, report: report)
     }

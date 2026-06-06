@@ -1,0 +1,10 @@
+{
+  "name": "ccfix",
+  "version": "0.1.0",
+  "watch": {
+    "terminals": ["com.apple.Terminal", "com.googlecode.iterm2"],
+    "maxClipboardBytes": 16384,
+    "dryRun": false
+  },
+  "profiles": ["claude-code"]
+}

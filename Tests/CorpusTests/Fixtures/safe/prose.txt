@@ -1,0 +1,5 @@
+The repair pipeline normalizes the copied text before doing anything else.
+It strips terminal escape sequences, collapses carriage returns to newlines,
+and only then looks for a wrap column. Ordinary prose like this paragraph must
+never be treated as a wrapped command, because rejoining its lines would change
+the meaning of the words on the page. The watcher leaves it exactly as copied.

@@ -1,0 +1,4 @@
+docker build \
+  --tag ccfix:latest \
+  --file Dockerfile \
+  .

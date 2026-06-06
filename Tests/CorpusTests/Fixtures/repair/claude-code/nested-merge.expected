@@ -1,0 +1,4 @@
+for f in *.swift; do
+    swift-format --in-place "$f"
+    git add "$f"
+done

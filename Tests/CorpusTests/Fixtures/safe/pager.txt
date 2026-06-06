@@ -1,0 +1,9 @@
+NAME
+     ccfix -- repair clipboard text mangled by TUI coding agents
+
+SYNOPSIS
+     ccfix [--no-copy] [--width n] [--watch]
+
+DESCRIPTION
+     The utility repairs exactly the selected fragment and leaves
+     ordinary copies untouched.

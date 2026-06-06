@@ -7,7 +7,9 @@ import Foundation
 ///  1. frontmost app is an allowlisted terminal,
 ///  2. the clipboard item is plain text,
 ///  3. the payload is within the size bound (`maxClipboardBytes`, default 16 KB),
-///  4. the repair changed the content,
+///  4. the repair made a *structural* change — a wrap rejoin or a dedent, not just
+///     §6.1 normalization (so a copy that merely contained escapes/CRLFs, with no
+///     wrap to fix, is left untouched — `RepairReport.structuralChange`),
 ///  5. the shell-signal tier passes (≥1 strong OR ≥2 weak — §6.7 / `Signals.Shell.passesGate`),
 ///  6. no structure-risk veto fires (markdown/stack-trace/prose — `Signals.Structure.vetoes`).
 ///
@@ -178,7 +180,11 @@ public enum WatchGate {
             isPlainText: isPlainText,
             frontmostBundleID: frontmostBundleID,
             report: report,
-            analysis: Signals.analyze(clipboard),
+            // Judge gate 5/6 on the *normalized* text — the same subject the repair
+            // classifies (§6.7) — so escape-sequence punctuation (the `;` in a
+            // `[1;34m` SGR or an OSC `]52;c;…`) can never masquerade as a shell
+            // operator and trip a false-positive signal (§13 ANSI/OSC fixtures).
+            analysis: Signals.analyze(Repair.normalize(clipboard)),
             config: config
         )
     }
@@ -224,12 +230,16 @@ public enum WatchGate {
         )
     }
 
-    /// Gate 4 — the repair changed the content (§7.4).
+    /// Gate 4 — the repair made a *structural* change (§7.4): a wrap rejoin or a
+    /// dedent, not merely §6.1 normalization. A copy that only carried escape/CRLF
+    /// noise (stripped by normalize) has nothing to fix and must not be rewritten.
     private static func changedGate(_ report: RepairReport) -> GateOutcome {
         GateOutcome(
             gate: .repairChangedContent,
-            passed: report.changed,
-            detail: report.changed ? "repair changed content" : "no change"
+            passed: report.structuralChange,
+            detail: report.structuralChange
+                ? "structural repair (rejoin/dedent)"
+                : (report.changed ? "normalization only — no structural change" : "no change")
         )
     }
 

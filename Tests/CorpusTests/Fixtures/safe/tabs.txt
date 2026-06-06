@@ -1,0 +1,4 @@
+name	status	notes
+repair	done	pure pipeline
+watch	done	six gates
+install	todo	tap + curl

@@ -43,6 +43,13 @@ let package = Package(
             name: "CCFixCoreTests",
             dependencies: ["CCFixCore"]
         ),
+        // §13 validation: a file-based fixture corpus proving zero watch-mode
+        // mutations on normal copies, plus golden repair captures per §5 case type.
+        .testTarget(
+            name: "CorpusTests",
+            dependencies: ["CCFixCore"],
+            resources: [.copy("Fixtures")]
+        ),
         .testTarget(
             name: "ClipboardTests",
             dependencies: ["Clipboard"]
