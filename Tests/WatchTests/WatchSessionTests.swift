@@ -116,6 +116,58 @@ struct WatchSessionTests {
         #expect(f.clip.lastSelfWriteChangeCount == f.clip.changeCount)
     }
 
+    @Test("A mutation records the original into the rollback buffer (§7.1)")
+    func mutationRecordsRollback() {
+        let fake = FakePasteboard()
+        let f = makeSession(fake)
+
+        f.session.handle(
+            .init(content: wrapped, isPlainText: true, frontmostBundleID: "com.apple.Terminal")
+        )
+
+        // The pre-mutation original is buffered, and taking it returns exactly it.
+        #expect(f.session.rollback.hasValue)
+        #expect(f.session.rollback.take() == wrapped)
+    }
+
+    @Test("A blocked gate clears any stale rollback original (§7.1)")
+    func blockedClearsRollback() {
+        let fake = FakePasteboard()
+        let f = makeSession(fake, frontmost: "com.apple.Safari")
+        f.session.rollback.record("stale original")
+
+        f.session.handle(
+            .init(content: wrapped, isPlainText: true, frontmostBundleID: "com.apple.Safari")
+        )
+
+        #expect(f.session.rollback.hasValue == false)
+    }
+
+    @Test("A non-plain-text copy clears any stale rollback original (§7.1)")
+    func nonPlainTextClearsRollback() {
+        let fake = FakePasteboard()
+        let f = makeSession(fake)
+        f.session.rollback.record("stale original")
+
+        f.session.handle(
+            .init(content: nil, isPlainText: false, frontmostBundleID: "com.apple.Terminal")
+        )
+
+        #expect(f.session.rollback.hasValue == false)
+    }
+
+    @Test("Dry-run never records a rollback original (nothing was mutated, §7.1)")
+    func dryRunNoRollback() {
+        let fake = FakePasteboard()
+        let f = makeSession(fake, dryRun: true)
+
+        f.session.handle(
+            .init(content: wrapped, isPlainText: true, frontmostBundleID: "com.apple.Terminal")
+        )
+
+        #expect(f.session.rollback.hasValue == false)
+    }
+
     @Test("Log line never contains the clipboard payload (content-safe, §7.3)")
     func contentSafe() {
         let fake = FakePasteboard()

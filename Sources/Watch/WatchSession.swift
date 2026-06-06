@@ -57,16 +57,22 @@ public final class WatchSession {
     private let options: Options
     /// Injected clock, so the log timestamp is deterministic in tests.
     private let now: () -> String
+    /// The single-slot rollback buffer (§7.1). Recorded into before a mutation,
+    /// cleared when a non-mutated copy goes by. Exposed so the daemon can wire the
+    /// same instance into the undo socket server.
+    public let rollback: RollbackStore
 
     public init(
         watcher: Watcher,
         log: WatchLog,
         options: Options = .init(),
+        rollback: RollbackStore = RollbackStore(),
         now: @escaping () -> String = WatchSession.iso8601Now
     ) {
         self.watcher = watcher
         self.log = log
         self.options = options
+        self.rollback = rollback
         self.now = now
         watcher.onExternalCopy = { [weak self] copy in
             self?.handle(copy)
@@ -87,6 +93,9 @@ public final class WatchSession {
             )
         else {
             // Non-plain-text item: §7.2 leaves it untouched. Logged for visibility.
+            // A copy we did not mutate is now the clipboard's truth, so any older
+            // undoable original is stale — drop it (§7.1).
+            rollback.clear()
             let frontmost = copy.frontmostBundleID ?? "unknown"
             log.record("\(now()) frontmost=\(frontmost) decision=skip blocked=plain-text")
             return .skippedNonPlainText
@@ -100,6 +109,9 @@ public final class WatchSession {
         )
 
         guard evaluation.decision.shouldMutate else {
+            // A gate blocked the rewrite: the copy stands as-is, so clear any stale
+            // undoable original (§7.1, "cleared on next user copy").
+            rollback.clear()
             return .skipped(evaluation.decision.blockingGate)
         }
 
@@ -107,6 +119,8 @@ public final class WatchSession {
             return .wouldMutate
         }
 
+        // Stash the original before overwriting it, so `ccfix undo` can restore it.
+        rollback.record(evaluation.original)
         watcher.applyMutation(evaluation.repaired)
         return .mutated
     }
