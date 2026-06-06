@@ -30,6 +30,12 @@ if let command = SetupCommand.parse(argv) {
     exit(SetupCommand.run(command, environment: SetupCommand.systemEnvironment()))
 }
 
+// `ccfix undo` is likewise a verb, not literal text to repair: it asks the running
+// daemon to restore the pre-fix clipboard over the undo socket (§7.1).
+if let command = UndoCommand.parse(argv) {
+    exit(UndoCommand.run(command, environment: UndoCommand.systemEnvironment()))
+}
+
 switch CLI.parse(argv) {
 case .help:
     print(CLI.helpText)
@@ -63,6 +69,31 @@ func runWatchDaemon(dryRun: Bool, options: RepairOptions, config: CCFixConfig) -
         )
     )
     _ = session  // retained for the lifetime of the process
+
+    // Expose the undo channel only in active mode: there is nothing to undo in
+    // dry-run (it never mutates), and the restore must route through this daemon's
+    // own clipboard so its self-write suppression doesn't re-repair the undo (§7.1).
+    var undoServer: UndoSocketServer?
+    if !dryRun {
+        let service = RollbackService(
+            store: session.rollback,
+            restore: { watcher.applyMutation($0) }
+        )
+        let server = UndoSocketServer(
+            socketURL: UndoSocketPath.defaultURL(),
+            server: UndoServer(service: service)
+        )
+        do {
+            try server.start()
+            undoServer = server
+        } catch {
+            FileHandle.standardError.write(
+                Data("ccfix: `ccfix undo` unavailable — \(error)\n".utf8)
+            )
+        }
+    }
+    _ = undoServer  // retained for the lifetime of the process
+
     watcher.start(pollInterval: config.pollInterval)
     let mode = dryRun ? "dry-run (log-only)" : "active (mutating)"
     FileHandle.standardError.write(

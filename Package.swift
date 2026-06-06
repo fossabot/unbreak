@@ -22,7 +22,7 @@ let package = Package(
         // from a real terminal/NSPasteboard (PRD v2 §8.1).
         .target(
             name: "CLI",
-            dependencies: ["CCFixCore", "Clipboard"]
+            dependencies: ["CCFixCore", "Clipboard", "Watch"]
         ),
         // User config: config.toml reader + CCFIX_* env overrides (PRD v2 §8.3).
         .target(
@@ -53,7 +53,7 @@ let package = Package(
         ),
         .testTarget(
             name: "CLITests",
-            dependencies: ["CLI", "CCFixCore", "Clipboard"]
+            dependencies: ["CLI", "CCFixCore", "Clipboard", "Watch"]
         ),
         .testTarget(
             name: "ConfigTests",

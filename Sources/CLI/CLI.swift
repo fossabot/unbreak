@@ -72,6 +72,8 @@ public enum CLI {
         repaired, strong shell signal, no structure-risk veto):
           ccfix --watch               run the fix-on-copy daemon (mutates clipboard)
           ccfix --dry-run-watch       run the daemon log-only — never mutates (§7.2)
+          ccfix undo                  restore the clipboard to before the last auto-fix
+                                      (asks the running watcher; single-slot, §7.1)
 
         SETUP & LOGIN WATCHER (§8.2) — the watcher is OFF until you opt in here:
           ccfix setup                 interactive: detect terminals, write config,
