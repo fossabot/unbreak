@@ -1,0 +1,163 @@
+import CCFixCore
+import Config
+import Foundation
+import Testing
+
+@testable import Setup
+
+@Suite("Setup-family argument parsing (PRD v2 §8.2)")
+struct SetupCommandParseTests {
+    @Test("`setup` parses, with and without --enable-agent")
+    func parseSetup() {
+        #expect(SetupCommand.parse(["setup"]) == .setup(enableAgent: false))
+        #expect(SetupCommand.parse(["setup", "--enable-agent"]) == .setup(enableAgent: true))
+    }
+
+    @Test("install-agent / uninstall-agent parse with no arguments")
+    func parseAgentVerbs() {
+        #expect(SetupCommand.parse(["install-agent"]) == .installAgent)
+        #expect(SetupCommand.parse(["uninstall-agent"]) == .uninstallAgent)
+    }
+
+    @Test("Non-setup argv falls through (nil) to the one-shot CLI")
+    func fallThrough() {
+        #expect(SetupCommand.parse([]) == nil)
+        #expect(SetupCommand.parse(["some text"]) == nil)
+        #expect(SetupCommand.parse(["--watch"]) == nil)
+        #expect(SetupCommand.parse(["-"]) == nil)
+    }
+
+    @Test("Unknown setup options and stray agent args are usage errors")
+    func errors() {
+        guard case .error = SetupCommand.parse(["setup", "--nope"]) else {
+            Issue.record("expected error for unknown setup option")
+            return
+        }
+        guard case .error = SetupCommand.parse(["install-agent", "extra"]) else {
+            Issue.record("expected error for stray install-agent argument")
+            return
+        }
+    }
+}
+
+/// A fully in-memory `SetupCommand.Environment` plus its recording backend.
+private final class Harness {
+    var stdout = ""
+    var stderr = ""
+    var answers: [String] = []
+    var detected: [TerminalDetector.Terminal] = []
+    var configContents: String?
+    var configPresent = false
+    let backend = FakeAgentBackend()
+    let configURL = URL(fileURLWithPath: "/Users/x/.config/ccfix/config.toml")
+
+    func environment() -> SetupCommand.Environment {
+        SetupCommand.Environment(
+            writeStdout: { self.stdout += $0 },
+            writeStderr: { self.stderr += $0 },
+            readLine: { self.answers.isEmpty ? nil : self.answers.removeFirst() },
+            detectTerminals: { self.detected },
+            configURL: configURL,
+            configExists: { _ in self.configPresent },
+            writeConfig: { contents, _ in
+                self.configContents = contents
+                self.configPresent = true
+            },
+            agentManager: backend.manager()
+        )
+    }
+}
+
+@Suite("Setup wizard run flow (PRD v2 §8.2)")
+struct SetupRunTests {
+    @Test("`setup` answered No writes config but does not install the agent")
+    func setupDeclined() {
+        let harness = Harness()
+        harness.detected = [.init(bundleID: "com.apple.Terminal", displayName: "Apple Terminal")]
+        harness.answers = ["n"]
+
+        let code = SetupCommand.run(.setup(enableAgent: false), environment: harness.environment())
+
+        #expect(code == 0)
+        #expect(harness.configContents?.contains("terminals = [\"com.apple.Terminal\"]") == true)
+        #expect(harness.backend.launchctlCalls.isEmpty)
+        #expect(harness.stdout.contains("Watcher left off"))
+    }
+
+    @Test("`setup` answered Yes installs the agent")
+    func setupAccepted() {
+        let harness = Harness()
+        harness.detected = [.init(bundleID: "com.mitchellh.ghostty", displayName: "Ghostty")]
+        harness.answers = ["y"]
+
+        let code = SetupCommand.run(.setup(enableAgent: false), environment: harness.environment())
+
+        #expect(code == 0)
+        #expect(harness.backend.written.count == 1)
+        #expect(harness.backend.launchctlCalls.contains { $0.first == "bootstrap" })
+    }
+
+    @Test("--enable-agent installs without prompting")
+    func enableAgentForced() {
+        let harness = Harness()
+        harness.detected = [.init(bundleID: "com.apple.Terminal", displayName: "Apple Terminal")]
+        // No answers queued: a prompt would read nil → No. Forced flag must win.
+
+        let code = SetupCommand.run(.setup(enableAgent: true), environment: harness.environment())
+
+        #expect(code == 0)
+        #expect(harness.backend.launchctlCalls.contains { $0.first == "bootstrap" })
+        #expect(!harness.stdout.contains("[y/N]"))
+    }
+
+    @Test("No detected terminals falls back to the shipped allowlist in config")
+    func noTerminalsFallsBack() {
+        let harness = Harness()
+        harness.answers = ["n"]
+
+        _ = SetupCommand.run(.setup(enableAgent: false), environment: harness.environment())
+
+        let contents = harness.configContents ?? ""
+        for bundleID in WatchGate.Config.defaultTerminalAllowlist {
+            #expect(contents.contains(bundleID))
+        }
+    }
+
+    @Test("An existing config is never overwritten")
+    func existingConfigUntouched() {
+        let harness = Harness()
+        harness.configPresent = true
+        harness.answers = ["n"]
+
+        _ = SetupCommand.run(.setup(enableAgent: false), environment: harness.environment())
+
+        #expect(harness.configContents == nil)
+        #expect(harness.stdout.contains("already exists"))
+    }
+
+    @Test("install-agent / uninstall-agent dispatch to the manager")
+    func agentVerbsDispatch() {
+        let harness = Harness()
+        #expect(SetupCommand.run(.installAgent, environment: harness.environment()) == 0)
+        #expect(harness.backend.written.count == 1)
+        #expect(SetupCommand.run(.uninstallAgent, environment: harness.environment()) == 0)
+        #expect(harness.backend.removed.count == 1)
+    }
+
+    @Test("A parse error routes to stderr with exit code 2")
+    func errorOutput() {
+        let harness = Harness()
+        let code = SetupCommand.run(.error("bad option"), environment: harness.environment())
+        #expect(code == 2)
+        #expect(harness.stderr.contains("bad option"))
+    }
+
+    @Test("Generated config reuses the documented sample defaults")
+    func configReusesSample() {
+        let contents = SetupCommand.configContents(terminals: ["com.apple.Terminal"])
+        #expect(contents.contains("terminals = [\"com.apple.Terminal\"]"))
+        // The fully-commented sample is appended so every other knob is documented.
+        #expect(contents.contains("poll_interval_ms"))
+        #expect(contents.contains("max_clipboard_bytes"))
+    }
+}

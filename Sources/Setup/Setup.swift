@@ -1,0 +1,254 @@
+import CCFixCore
+import Config
+import Foundation
+
+/// The setup-family subcommands (PRD v2 §8.2): the install wizard and the
+/// LaunchAgent lifecycle commands.
+///
+/// These sit *in front of* the one-shot `CLI` grammar: `ccfix setup` must not be
+/// read as "repair the literal text `setup`". `parse` therefore returns `nil` for
+/// anything that is not a setup-family command, letting the executable fall
+/// through to `CLI.parse`. The run driver's I/O is injected via `Environment` so
+/// the whole flow — prompts, config write, agent install — is unit-testable.
+public enum SetupCommand {
+    /// A recognized setup-family invocation, or a usage error for one.
+    public enum Parsed: Equatable {
+        /// `ccfix setup [--enable-agent]`. `enableAgent` forces the watcher on
+        /// without prompting (for scripted installs).
+        case setup(enableAgent: Bool)
+        /// `ccfix install-agent`.
+        case installAgent
+        /// `ccfix uninstall-agent`.
+        case uninstallAgent
+        /// A usage error; printed to stderr, exit code 2.
+        case error(String)
+    }
+
+    /// Parse `argv` (already stripped of the executable path). Returns `nil` when
+    /// the first token is not a setup-family verb, so the caller can fall through
+    /// to the one-shot CLI.
+    public static func parse(_ argv: [String]) -> Parsed? {
+        guard let verb = argv.first else { return nil }
+        let rest = Array(argv.dropFirst())
+        switch verb {
+        case "setup":
+            return parseSetup(rest)
+        case "install-agent":
+            return rest.isEmpty
+                ? .installAgent
+                : .error("install-agent takes no arguments (got '\(rest[0])')")
+        case "uninstall-agent":
+            return rest.isEmpty
+                ? .uninstallAgent
+                : .error("uninstall-agent takes no arguments (got '\(rest[0])')")
+        default:
+            return nil
+        }
+    }
+
+    private static func parseSetup(_ rest: [String]) -> Parsed {
+        var enableAgent = false
+        for arg in rest {
+            switch arg {
+            case "--enable-agent":
+                enableAgent = true
+            default:
+                return .error("unknown setup option '\(arg)' (see --help)")
+            }
+        }
+        return .setup(enableAgent: enableAgent)
+    }
+}
+
+extension SetupCommand {
+    /// The injectable surface the run driver writes through: prompts, config-file
+    /// I/O, terminal detection, and the LaunchAgent manager.
+    public struct Environment {
+        public var writeStdout: (String) -> Void
+        public var writeStderr: (String) -> Void
+        /// Reads one line of user input (without the trailing newline), or `nil`
+        /// at EOF / when no terminal is attached — treated as "no".
+        public var readLine: () -> String?
+        /// The terminals to seed the allowlist with (already detected).
+        public var detectTerminals: () -> [TerminalDetector.Terminal]
+        public var configURL: URL
+        public var configExists: (URL) -> Bool
+        public var writeConfig: (_ contents: String, _ url: URL) throws -> Void
+        public var agentManager: LaunchAgentManager
+
+        public init(
+            writeStdout: @escaping (String) -> Void,
+            writeStderr: @escaping (String) -> Void,
+            readLine: @escaping () -> String?,
+            detectTerminals: @escaping () -> [TerminalDetector.Terminal],
+            configURL: URL,
+            configExists: @escaping (URL) -> Bool,
+            writeConfig: @escaping (_ contents: String, _ url: URL) throws -> Void,
+            agentManager: LaunchAgentManager
+        ) {
+            self.writeStdout = writeStdout
+            self.writeStderr = writeStderr
+            self.readLine = readLine
+            self.detectTerminals = detectTerminals
+            self.configURL = configURL
+            self.configExists = configExists
+            self.writeConfig = writeConfig
+            self.agentManager = agentManager
+        }
+    }
+
+    /// Run a parsed setup-family command and return the process exit code.
+    public static func run(_ command: Parsed, environment: Environment) -> Int32 {
+        switch command {
+        case .setup(let enableAgent):
+            return runSetup(enableAgent: enableAgent, environment: environment)
+        case .installAgent:
+            return finish(environment.agentManager.install(), environment: environment)
+        case .uninstallAgent:
+            return finish(environment.agentManager.uninstall(), environment: environment)
+        case .error(let message):
+            environment.writeStderr("ccfix: \(message)\n")
+            return 2
+        }
+    }
+
+    /// The interactive wizard: detect terminals → write the config scaffold →
+    /// decide on the login watcher (forced by `--enable-agent`, else prompted).
+    private static func runSetup(enableAgent: Bool, environment: Environment) -> Int32 {
+        let terminals = environment.detectTerminals()
+        reportDetected(terminals, environment: environment)
+        writeConfigScaffold(terminals, environment: environment)
+
+        let enable = enableAgent || promptEnableAgent(environment: environment)
+        guard enable else {
+            environment.writeStdout(
+                """
+                Watcher left off. Enable it any time with `ccfix install-agent`
+                (or re-run `ccfix setup`). One-shot `ccfix` still works regardless.
+
+                """
+            )
+            return 0
+        }
+        return finish(environment.agentManager.install(), environment: environment)
+    }
+
+    private static func reportDetected(
+        _ terminals: [TerminalDetector.Terminal],
+        environment: Environment
+    ) {
+        guard !terminals.isEmpty else {
+            environment.writeStdout(
+                """
+                No known terminals detected. Seeding the allowlist with the shipped
+                defaults (cmux, Ghostty, iTerm2, Apple Terminal). Edit
+                \(environment.configURL.path) to adjust.
+
+                """
+            )
+            return
+        }
+        let lines =
+            terminals
+            .map { "  • \($0.displayName)  (\($0.bundleID))" }
+            .joined(separator: "\n")
+        environment.writeStdout(
+            """
+            Detected terminals — watch mode will act only when one of these is frontmost:
+            \(lines)
+
+            """
+        )
+    }
+
+    /// Write the config scaffold with the detected allowlist active. An existing
+    /// config is never clobbered — the wizard reports it and moves on.
+    private static func writeConfigScaffold(
+        _ terminals: [TerminalDetector.Terminal],
+        environment: Environment
+    ) {
+        if environment.configExists(environment.configURL) {
+            environment.writeStdout(
+                "Config already exists at \(environment.configURL.path); leaving it untouched.\n\n"
+            )
+            return
+        }
+        let bundleIDs =
+            terminals.isEmpty
+            ? WatchGate.Config.defaultTerminalAllowlist
+            : Set(terminals.map(\.bundleID))
+        do {
+            try environment.writeConfig(configContents(terminals: bundleIDs), environment.configURL)
+            environment.writeStdout("Wrote \(environment.configURL.path).\n\n")
+        } catch {
+            environment.writeStderr(
+                "ccfix: could not write \(environment.configURL.path): \(error)\n"
+            )
+        }
+    }
+
+    /// Prompt "enable the auto-fix watcher at login? [y/N]". Defaults to **no**:
+    /// the watcher stays off unless the user explicitly opts in (§8.2). EOF / no
+    /// terminal also reads as no.
+    private static func promptEnableAgent(environment: Environment) -> Bool {
+        environment.writeStdout("Enable the auto-fix watcher at login? [y/N] ")
+        guard let answer = environment.readLine() else { return false }
+        let normalized = answer.trimmingCharacters(in: .whitespaces).lowercased()
+        return normalized == "y" || normalized == "yes"
+    }
+
+    private static func finish(
+        _ outcome: LaunchAgentManager.Outcome,
+        environment: Environment
+    ) -> Int32 {
+        if outcome.exitCode == 0 {
+            environment.writeStdout(outcome.message + "\n")
+        } else {
+            environment.writeStderr(outcome.message + "\n")
+        }
+        return outcome.exitCode
+    }
+
+    /// The production environment: real stdin/stdout/stderr, the default config
+    /// path, on-disk config write, `NSWorkspace` terminal detection, and the
+    /// system LaunchAgent manager.
+    public static func systemEnvironment() -> Environment {
+        Environment(
+            writeStdout: { FileHandle.standardOutput.write(Data($0.utf8)) },
+            writeStderr: { FileHandle.standardError.write(Data($0.utf8)) },
+            readLine: { Swift.readLine(strippingNewline: true) },
+            detectTerminals: {
+                #if canImport(AppKit)
+                return TerminalDetector.systemDetected()
+                #else
+                return []
+                #endif
+            },
+            configURL: ConfigLoader.defaultConfigURL(),
+            configExists: { FileManager.default.fileExists(atPath: $0.path) },
+            writeConfig: { contents, url in
+                try FileManager.default.createDirectory(
+                    at: url.deletingLastPathComponent(),
+                    withIntermediateDirectories: true
+                )
+                try contents.write(to: url, atomically: true, encoding: .utf8)
+            },
+            agentManager: .system()
+        )
+    }
+
+    /// Build a `config.toml` with the chosen allowlist active, followed by the
+    /// fully-commented `CCFixConfig.sampleTOML` defaults so every other knob is
+    /// documented in place.
+    public static func configContents(terminals: Set<String>) -> String {
+        let array = terminals.sorted().map { "\"\($0)\"" }.joined(separator: ", ")
+        return """
+            # ccfix configuration — written by `ccfix setup`.
+            # The active line below was filled in from detected terminals; the
+            # commented defaults that follow document every other available option.
+            terminals = [\(array)]
+
+            \(CCFixConfig.sampleTOML)
+            """
+    }
+}

@@ -29,10 +29,15 @@ let package = Package(
             name: "Config",
             dependencies: ["CCFixCore"]
         ),
+        // Setup wizard + per-user LaunchAgent lifecycle (PRD v2 §8.2, §7.4).
+        .target(
+            name: "Setup",
+            dependencies: ["CCFixCore", "Config"]
+        ),
         // Thin executable shim around CLI (§8.1) + the watch daemon (§7).
         .executableTarget(
             name: "ccfix",
-            dependencies: ["CCFixCore", "Clipboard", "Watch", "CLI", "Config"]
+            dependencies: ["CCFixCore", "Clipboard", "Watch", "CLI", "Config", "Setup"]
         ),
         .testTarget(
             name: "CCFixCoreTests",
@@ -53,6 +58,10 @@ let package = Package(
         .testTarget(
             name: "ConfigTests",
             dependencies: ["Config", "CCFixCore"]
+        ),
+        .testTarget(
+            name: "SetupTests",
+            dependencies: ["Setup", "CCFixCore", "Config"]
         ),
     ]
 )

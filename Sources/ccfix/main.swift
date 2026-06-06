@@ -3,6 +3,7 @@ import CLI
 import Clipboard
 import Config
 import Foundation
+import Setup
 import Watch
 
 #if canImport(AppKit)
@@ -10,9 +11,9 @@ import AppKit
 #endif
 
 // Thin shim over the `CLI` surface (PRD v2 §8.1): load user config (§8.3), parse
-// argv, then either hand off to the watch daemon (§7) — which owns the run loop —
-// or run a one-shot repair through the shared `Clipboard` backend. The setup
-// wizard and LaunchAgent management (§8.2) are not wired up yet.
+// argv, then either run a setup-family subcommand (§8.2), hand off to the watch
+// daemon (§7) — which owns the run loop — or run a one-shot repair through the
+// shared `Clipboard` backend.
 
 let loaded = ConfigLoader.load()
 for warning in loaded.warnings {
@@ -20,7 +21,16 @@ for warning in loaded.warnings {
 }
 let config = loaded.config
 
-switch CLI.parse(Array(CommandLine.arguments.dropFirst())) {
+let argv = Array(CommandLine.arguments.dropFirst())
+
+// Setup-family verbs (`setup`, `install-agent`, `uninstall-agent`) are handled
+// ahead of the one-shot grammar, which would otherwise read `setup` as literal
+// text to repair. `parse` returns nil for everything else, so we fall through.
+if let command = SetupCommand.parse(argv) {
+    exit(SetupCommand.run(command, environment: SetupCommand.systemEnvironment()))
+}
+
+switch CLI.parse(argv) {
 case .help:
     print(CLI.helpText)
     exit(0)

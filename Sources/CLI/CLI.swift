@@ -72,6 +72,13 @@ public enum CLI {
         repaired, strong shell signal, no structure-risk veto):
           ccfix --watch               run the fix-on-copy daemon (mutates clipboard)
           ccfix --dry-run-watch       run the daemon log-only — never mutates (§7.2)
+
+        SETUP & LOGIN WATCHER (§8.2) — the watcher is OFF until you opt in here:
+          ccfix setup                 interactive: detect terminals, write config,
+                                      prompt to enable the watcher at login
+          ccfix setup --enable-agent  non-interactive setup that forces the watcher on
+          ccfix install-agent         install + start the per-user login LaunchAgent
+          ccfix uninstall-agent       stop + remove the login LaunchAgent
         """
 
     /// Parse `argv` (already stripped of the executable path) into a `Parsed`.
