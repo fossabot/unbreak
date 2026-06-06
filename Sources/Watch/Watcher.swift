@@ -61,13 +61,21 @@ public final class Watcher: @unchecked Sendable {
     public struct Evaluation: Equatable, Sendable {
         /// The full gate decision (which gates passed, byte/line counts, log line).
         public let decision: WatchGate.Decision
+        /// The §6 repair report — its signal floats feed the content-safe log (§7.3).
+        public let report: RepairReport
         /// The original copied text, kept so a rollback buffer can restore it (§7.1).
         public let original: String
         /// The repaired text the mutation step would write if `decision.shouldMutate`.
         public let repaired: String
 
-        public init(decision: WatchGate.Decision, original: String, repaired: String) {
+        public init(
+            decision: WatchGate.Decision,
+            report: RepairReport,
+            original: String,
+            repaired: String
+        ) {
             self.decision = decision
+            self.report = report
             self.original = original
             self.repaired = repaired
         }
@@ -131,7 +139,21 @@ public final class Watcher: @unchecked Sendable {
             report: result.report,
             config: config
         )
-        return Evaluation(decision: decision, original: content, repaired: result.text)
+        return Evaluation(
+            decision: decision,
+            report: result.report,
+            original: content,
+            repaired: result.text
+        )
+    }
+
+    /// Write a repaired payload to the clipboard, recording it as a self-write so
+    /// the next `poll()` swallows it instead of re-triggering the loop (§7.4). The
+    /// gated-pipeline daemon (`WatchSession`) calls this only after a
+    /// `Decision.shouldMutate`. Mutation routes through the watcher because it owns
+    /// the `Clipboard` and thus the self-write bookkeeping.
+    public func applyMutation(_ text: String) {
+        clipboard.write(text)
     }
 
     // MARK: - Run loop (AppKit)
