@@ -18,17 +18,22 @@ public final class WatchSession {
         /// Log what *would* happen, never touch the clipboard (`--dry-run-watch`,
         /// §7.2). The primary QA tool for threshold tuning.
         public var dryRun: Bool
+        /// Wrap profile forwarded to `Repair.repair` (§6.6 / §8.3).
+        public var profile: WrapProfile
         /// Repair knobs forwarded to `Repair.repair` (§6).
         public var repair: RepairOptions
-        /// Gate configuration: terminal allowlist + size bound (§8.3).
+        /// Gate configuration: terminal allowlist + size bound + optional float
+        /// thresholds (§8.3).
         public var gate: WatchGate.Config
 
         public init(
             dryRun: Bool = false,
+            profile: WrapProfile = .claudeCode,
             repair: RepairOptions = .init(),
             gate: WatchGate.Config = .init()
         ) {
             self.dryRun = dryRun
+            self.profile = profile
             self.repair = repair
             self.gate = gate
         }
@@ -76,6 +81,7 @@ public final class WatchSession {
         guard
             let evaluation = watcher.evaluate(
                 copy,
+                profile: options.profile,
                 options: options.repair,
                 config: options.gate
             )

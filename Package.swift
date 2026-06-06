@@ -24,10 +24,15 @@ let package = Package(
             name: "CLI",
             dependencies: ["CCFixCore", "Clipboard"]
         ),
+        // User config: config.toml reader + CCFIX_* env overrides (PRD v2 §8.3).
+        .target(
+            name: "Config",
+            dependencies: ["CCFixCore"]
+        ),
         // Thin executable shim around CLI (§8.1) + the watch daemon (§7).
         .executableTarget(
             name: "ccfix",
-            dependencies: ["CCFixCore", "Clipboard", "Watch", "CLI"]
+            dependencies: ["CCFixCore", "Clipboard", "Watch", "CLI", "Config"]
         ),
         .testTarget(
             name: "CCFixCoreTests",
@@ -44,6 +49,10 @@ let package = Package(
         .testTarget(
             name: "CLITests",
             dependencies: ["CLI", "CCFixCore", "Clipboard"]
+        ),
+        .testTarget(
+            name: "ConfigTests",
+            dependencies: ["Config", "CCFixCore"]
         ),
     ]
 )

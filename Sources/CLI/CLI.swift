@@ -187,7 +187,11 @@ public enum CLI {
     ///                  differs* (permissive — the user asked, but a no-op write
     ///                  would needlessly bump the system change count, §7.4).
     @discardableResult
-    public static func runOneShot(_ arguments: Arguments, environment: Environment) -> Int32 {
+    public static func runOneShot(
+        _ arguments: Arguments,
+        profile: WrapProfile = .claudeCode,
+        environment: Environment
+    ) -> Int32 {
         let input: String
         switch arguments.source {
         case .stdin:
@@ -202,7 +206,7 @@ public enum CLI {
             input = clipboard.plainText() ?? ""
         }
 
-        let result = Repair.repair(input, options: arguments.options)
+        let result = Repair.repair(input, profile: profile, options: arguments.options)
         return deliver(
             result,
             source: arguments.source,

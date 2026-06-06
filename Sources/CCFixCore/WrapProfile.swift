@@ -2,7 +2,7 @@
 ///
 /// Adding Gemini/Codex support should be a new value here plus fixtures, not new
 /// code paths. v1 ships `claudeCode` only.
-public struct WrapProfile: Sendable {
+public struct WrapProfile: Sendable, Equatable {
     public var name: String
     /// Tokens that, when a line ends with one, mark an *intentional* line break
     /// (heredoc/`\` layout/one-operator-per-line) that must be preserved (§6.3).
@@ -31,6 +31,17 @@ public struct WrapProfile: Sendable {
         name: "claude-code",
         continuationTokens: ["\\", "&&", "||", "|", "(", ","]
     )
+
+    /// Every profile that ships, keyed by its `name` — the lookup the config's
+    /// `wrap_profile` key resolves against (§8.3). v1 ships `claude-code` only;
+    /// adding Gemini/Codex (§6.6) means adding a value here.
+    public static let all: [WrapProfile] = [.claudeCode]
+
+    /// Resolve a profile by `name`, or `nil` if no shipped profile matches. The
+    /// config loader turns a `nil` into a warning and falls back to the default.
+    public static func named(_ name: String) -> WrapProfile? {
+        all.first { $0.name == name }
+    }
 }
 
 /// One-shot CLI options (PRD v2 §8.1).

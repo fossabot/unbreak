@@ -27,6 +27,14 @@ public enum WatchGate {
     public struct Config: Sendable, Equatable {
         public var terminalAllowlist: Set<String>
         public var maxClipboardBytes: Int
+        /// Optional power-user override for gate 5 (§7.5): when set, the shell gate
+        /// passes iff `Signals.Shell.score ≥ this`, replacing the discrete tier
+        /// rule. `nil` (the default) keeps the shipped discrete rule (§8.3).
+        public var shellSignalScoreThreshold: Double?
+        /// Optional power-user override for gate 6 (§7.6): when set, the structure
+        /// gate vetoes iff `Signals.Structure.risk ≥ this`, replacing the discrete
+        /// veto rule. `nil` (the default) keeps the shipped discrete rule (§8.3).
+        public var structureRiskThreshold: Double?
 
         /// Default bundle ids for the §7 allowlist: cmux, Ghostty, iTerm2, Apple
         /// Terminal. User-extensible via config/env (§8.3).
@@ -40,10 +48,14 @@ public enum WatchGate {
 
         public init(
             terminalAllowlist: Set<String> = Config.defaultTerminalAllowlist,
-            maxClipboardBytes: Int = 16 * 1024
+            maxClipboardBytes: Int = 16 * 1024,
+            shellSignalScoreThreshold: Double? = nil,
+            structureRiskThreshold: Double? = nil
         ) {
             self.terminalAllowlist = terminalAllowlist
             self.maxClipboardBytes = maxClipboardBytes
+            self.shellSignalScoreThreshold = shellSignalScoreThreshold
+            self.structureRiskThreshold = structureRiskThreshold
         }
     }
 
@@ -139,8 +151,8 @@ public enum WatchGate {
             plainTextGate(isPlainText),  // §7.2
             sizeGate(byteCount: byteCount, config: config),  // §7.3
             changedGate(report),  // §7.4
-            shellGate(analysis.shell),  // §7.5
-            structureGate(analysis.structure),  // §7.6
+            shellGate(analysis.shell, config: config),  // §7.5
+            structureGate(analysis.structure, config: config),  // §7.6
         ]
 
         return Decision(
@@ -222,9 +234,20 @@ public enum WatchGate {
         )
     }
 
-    /// Gate 5 — high-confidence shell signal, discrete tiers (§7.5 / §6.7).
-    private static func shellGate(_ shell: Signals.Shell) -> GateOutcome {
-        GateOutcome(
+    /// Gate 5 — high-confidence shell signal (§7.5 / §6.7). Discrete tiers by
+    /// default; a configured `shellSignalScoreThreshold` switches to the float
+    /// score (§8.3 power-user override).
+    private static func shellGate(_ shell: Signals.Shell, config: Config) -> GateOutcome {
+        if let threshold = config.shellSignalScoreThreshold {
+            let passed = shell.score >= threshold
+            return GateOutcome(
+                gate: .shellSignal,
+                passed: passed,
+                detail: "shell score \(scoreString(shell.score)) "
+                    + (passed ? "≥ " : "< ") + "\(scoreString(threshold)) threshold"
+            )
+        }
+        return GateOutcome(
             gate: .shellSignal,
             passed: shell.passesGate,
             detail: "shell signals: \(shell.strongCount) strong / \(shell.weakCount) weak"
@@ -232,14 +255,32 @@ public enum WatchGate {
         )
     }
 
-    /// Gate 6 — structure-risk veto (§7.6). Passes when nothing vetoes.
-    private static func structureGate(_ structure: Signals.Structure) -> GateOutcome {
+    /// Gate 6 — structure-risk veto (§7.6). Passes when nothing vetoes; a
+    /// configured `structureRiskThreshold` switches to the float risk estimate
+    /// (§8.3 power-user override).
+    private static func structureGate(
+        _ structure: Signals.Structure,
+        config: Config
+    ) -> GateOutcome {
+        if let threshold = config.structureRiskThreshold {
+            let clear = structure.risk < threshold
+            return GateOutcome(
+                gate: .structureRiskClear,
+                passed: clear,
+                detail: "structure risk \(scoreString(structure.risk)) "
+                    + (clear ? "< " : "≥ ") + "\(scoreString(threshold)) threshold"
+            )
+        }
         let clear = !structure.vetoes
         return GateOutcome(
             gate: .structureRiskClear,
             passed: clear,
             detail: clear ? "no structure-risk veto" : "veto: \(structureVetoReason(structure))"
         )
+    }
+
+    private static func scoreString(_ value: Double) -> String {
+        String(format: "%.2f", value)
     }
 
     /// Which structure pattern(s) fired the veto, for the log detail (§7.6).

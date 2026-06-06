@@ -127,11 +127,12 @@ public final class Watcher: @unchecked Sendable {
     /// their own tasks. Returns `nil` for a non-plain-text item (nothing to repair).
     public func evaluate(
         _ copy: ExternalCopy,
+        profile: WrapProfile = .claudeCode,
         options: RepairOptions = .init(),
         config: WatchGate.Config = .init()
     ) -> Evaluation? {
         guard let content = copy.content else { return nil }
-        let result = Repair.repair(content, options: options)
+        let result = Repair.repair(content, profile: profile, options: options)
         let decision = WatchGate.decide(
             clipboard: content,
             isPlainText: copy.isPlainText,
