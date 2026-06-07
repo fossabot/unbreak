@@ -1,9 +1,9 @@
-# Homebrew formula for unbreak (PRD v2 §9, working name — see §11).
+# Homebrew formula for unbreak (PRD v2 §9).
 #
-# Lives in the tap repo `<handle>/homebrew-tap` as `Formula/unbreak.rb`, so users
-# install with:
+# Lives in the tap repo `bart-turczynski/homebrew-tap` as `Formula/unbreak.rb`, so
+# users install with:
 #
-#   brew install <handle>/tap/unbreak
+#   brew install bart-turczynski/tap/unbreak
 #
 # Builds from source (needs the Swift toolchain from the Xcode Command Line
 # Tools); pre-built bottles are a later optimization (§12). On each tagged
