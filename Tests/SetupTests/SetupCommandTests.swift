@@ -19,6 +19,20 @@ struct SetupCommandParseTests {
         #expect(SetupCommand.parse(["uninstall-agent"]) == .uninstallAgent)
     }
 
+    @Test("`uninstall` parses, with and without --keep-config")
+    func parseUninstall() {
+        #expect(SetupCommand.parse(["uninstall"]) == .uninstall(keepConfig: false))
+        #expect(SetupCommand.parse(["uninstall", "--keep-config"]) == .uninstall(keepConfig: true))
+    }
+
+    @Test("Unknown uninstall option is a usage error")
+    func uninstallBadOption() {
+        guard case .error = SetupCommand.parse(["uninstall", "--nope"]) else {
+            Issue.record("expected error for unknown uninstall option")
+            return
+        }
+    }
+
     @Test("Non-setup argv falls through (nil) to the one-shot CLI")
     func fallThrough() {
         #expect(SetupCommand.parse([]) == nil)
@@ -50,6 +64,11 @@ private final class Harness {
     var configPresent = false
     let backend = FakeAgentBackend()
     let configURL = URL(fileURLWithPath: "/Users/x/.config/ccfix/config.toml")
+    /// State files (logs, socket) that uninstall should clean up, and the set
+    /// currently "present" on the fake filesystem.
+    var stateFiles: [URL] = []
+    var present: Set<String> = []
+    var removed: [URL] = []
 
     func environment() -> SetupCommand.Environment {
         SetupCommand.Environment(
@@ -58,11 +77,20 @@ private final class Harness {
             readLine: { self.answers.isEmpty ? nil : self.answers.removeFirst() },
             detectTerminals: { self.detected },
             configURL: configURL,
-            configExists: { _ in self.configPresent },
+            fileExists: { url in
+                if url == self.configURL { return self.configPresent }
+                return self.present.contains(url.path)
+            },
             writeConfig: { contents, _ in
                 self.configContents = contents
                 self.configPresent = true
             },
+            removeFile: { url in
+                self.removed.append(url)
+                self.present.remove(url.path)
+                if url == self.configURL { self.configPresent = false }
+            },
+            stateFiles: stateFiles,
             agentManager: backend.manager()
         )
     }
@@ -142,6 +170,74 @@ struct SetupRunTests {
         #expect(harness.backend.written.count == 1)
         #expect(SetupCommand.run(.uninstallAgent, environment: harness.environment()) == 0)
         #expect(harness.backend.removed.count == 1)
+    }
+
+    @Test("`uninstall` removes the agent, state files, and config")
+    func uninstallRemovesEverything() {
+        let harness = Harness()
+        harness.backend.binary = "/opt/homebrew/Cellar/ccfix/0.1.0/bin/ccfix"
+        _ = backendInstall(harness)  // an agent is present to remove
+        harness.configPresent = true
+        let log = URL(fileURLWithPath: "/Users/x/Library/Logs/ccfix.log")
+        let sock = URL(fileURLWithPath: "/Users/x/Library/Application Support/ccfix/undo.sock")
+        harness.stateFiles = [log, sock]
+        harness.present = [log.path, sock.path]
+
+        let code = SetupCommand.run(
+            .uninstall(keepConfig: false),
+            environment: harness.environment()
+        )
+
+        #expect(code == 0)
+        #expect(harness.backend.removed.count == 1)  // the plist
+        #expect(harness.removed.contains(log))
+        #expect(harness.removed.contains(sock))
+        #expect(harness.removed.contains(harness.configURL))
+        #expect(harness.stdout.contains("ccfix.log"))
+        // Homebrew-managed binary (the fake's default path) → brew uninstall hint.
+        #expect(harness.stdout.contains("brew uninstall ccfix"))
+    }
+
+    @Test("`uninstall --keep-config` spares the config file")
+    func uninstallKeepsConfig() {
+        let harness = Harness()
+        harness.configPresent = true
+
+        let code = SetupCommand.run(
+            .uninstall(keepConfig: true),
+            environment: harness.environment()
+        )
+
+        #expect(code == 0)
+        #expect(!harness.removed.contains(harness.configURL))
+        #expect(harness.stdout.contains("Keeping config"))
+    }
+
+    @Test("`uninstall` with no state present is a clean no-op")
+    func uninstallNothingPresent() {
+        let harness = Harness()
+        let code = SetupCommand.run(
+            .uninstall(keepConfig: false),
+            environment: harness.environment()
+        )
+        #expect(code == 0)
+        #expect(harness.removed.isEmpty)
+        #expect(harness.stdout.contains("No ccfix state files were present"))
+    }
+
+    @Test("`uninstall` steers a non-Homebrew binary to a plain rm")
+    func uninstallNonBrewBinary() {
+        let harness = Harness()
+        harness.backend.binary = "/usr/local/bin/ccfix"
+        _ = SetupCommand.run(.uninstall(keepConfig: false), environment: harness.environment())
+        #expect(harness.stdout.contains("rm /usr/local/bin/ccfix"))
+        #expect(!harness.stdout.contains("brew uninstall"))
+    }
+
+    /// Install an agent through the harness's backend so a later uninstall has a
+    /// plist to bootout + remove.
+    private func backendInstall(_ harness: Harness) -> Int32 {
+        SetupCommand.run(.installAgent, environment: harness.environment())
     }
 
     @Test("A parse error routes to stderr with exit code 2")

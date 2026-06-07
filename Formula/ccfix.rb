@@ -55,6 +55,11 @@ class Ccfix < Formula
       One-shot use never needs the watcher:
 
         pbpaste | ccfix -             # repair clipboard text, print to stdout
+
+      To remove everything ccfix wrote (login watcher, logs, undo socket, config)
+      before `brew uninstall ccfix`, run:
+
+        ccfix uninstall               # `brew uninstall` alone leaves this state behind
     EOS
   end
 

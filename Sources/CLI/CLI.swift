@@ -81,6 +81,9 @@ public enum CLI {
           ccfix setup --enable-agent  non-interactive setup that forces the watcher on
           ccfix install-agent         install + start the per-user login LaunchAgent
           ccfix uninstall-agent       stop + remove the login LaunchAgent
+          ccfix uninstall             remove all ccfix state (agent, logs, socket,
+                                      config); pass --keep-config to spare the config.
+                                      Reports how to remove the binary itself.
         """
 
     /// Parse `argv` (already stripped of the executable path) into a `Parsed`.

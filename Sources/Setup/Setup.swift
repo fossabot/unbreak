@@ -20,6 +20,12 @@ public enum SetupCommand {
         case installAgent
         /// `ccfix uninstall-agent`.
         case uninstallAgent
+        /// `ccfix uninstall [--keep-config]`. Tear down every trace of ccfix
+        /// *state* — the login LaunchAgent, logs, and the undo socket, plus the
+        /// config file unless `keepConfig`. The binary is reported, not deleted
+        /// (a running, possibly Homebrew-managed binary can't safely remove
+        /// itself — §9).
+        case uninstall(keepConfig: Bool)
         /// A usage error; printed to stderr, exit code 2.
         case error(String)
     }
@@ -41,9 +47,24 @@ public enum SetupCommand {
             return rest.isEmpty
                 ? .uninstallAgent
                 : .error("uninstall-agent takes no arguments (got '\(rest[0])')")
+        case "uninstall":
+            return parseUninstall(rest)
         default:
             return nil
         }
+    }
+
+    private static func parseUninstall(_ rest: [String]) -> Parsed {
+        var keepConfig = false
+        for arg in rest {
+            switch arg {
+            case "--keep-config":
+                keepConfig = true
+            default:
+                return .error("unknown uninstall option '\(arg)' (see --help)")
+            }
+        }
+        return .uninstall(keepConfig: keepConfig)
     }
 
     private static func parseSetup(_ rest: [String]) -> Parsed {
@@ -72,8 +93,15 @@ extension SetupCommand {
         /// The terminals to seed the allowlist with (already detected).
         public var detectTerminals: () -> [TerminalDetector.Terminal]
         public var configURL: URL
-        public var configExists: (URL) -> Bool
+        /// Reports whether a file exists at `url` (config presence and, during
+        /// uninstall, each state file).
+        public var fileExists: (URL) -> Bool
         public var writeConfig: (_ contents: String, _ url: URL) throws -> Void
+        /// Removes the file at `url` (used by uninstall); a missing file is fine.
+        public var removeFile: (_ url: URL) throws -> Void
+        /// The ccfix-created state files uninstall should clean up beyond the
+        /// config and LaunchAgent: the watch logs and the undo socket (§7.1, §7.3).
+        public var stateFiles: [URL]
         public var agentManager: LaunchAgentManager
 
         public init(
@@ -82,8 +110,10 @@ extension SetupCommand {
             readLine: @escaping () -> String?,
             detectTerminals: @escaping () -> [TerminalDetector.Terminal],
             configURL: URL,
-            configExists: @escaping (URL) -> Bool,
+            fileExists: @escaping (URL) -> Bool,
             writeConfig: @escaping (_ contents: String, _ url: URL) throws -> Void,
+            removeFile: @escaping (_ url: URL) throws -> Void,
+            stateFiles: [URL],
             agentManager: LaunchAgentManager
         ) {
             self.writeStdout = writeStdout
@@ -91,8 +121,10 @@ extension SetupCommand {
             self.readLine = readLine
             self.detectTerminals = detectTerminals
             self.configURL = configURL
-            self.configExists = configExists
+            self.fileExists = fileExists
             self.writeConfig = writeConfig
+            self.removeFile = removeFile
+            self.stateFiles = stateFiles
             self.agentManager = agentManager
         }
     }
@@ -106,6 +138,8 @@ extension SetupCommand {
             return finish(environment.agentManager.install(), environment: environment)
         case .uninstallAgent:
             return finish(environment.agentManager.uninstall(), environment: environment)
+        case .uninstall(let keepConfig):
+            return runUninstall(keepConfig: keepConfig, environment: environment)
         case .error(let message):
             environment.writeStderr("ccfix: \(message)\n")
             return 2
@@ -167,7 +201,7 @@ extension SetupCommand {
         _ terminals: [TerminalDetector.Terminal],
         environment: Environment
     ) {
-        if environment.configExists(environment.configURL) {
+        if environment.fileExists(environment.configURL) {
             environment.writeStdout(
                 "Config already exists at \(environment.configURL.path); leaving it untouched.\n\n"
             )
@@ -225,7 +259,7 @@ extension SetupCommand {
                 #endif
             },
             configURL: ConfigLoader.defaultConfigURL(),
-            configExists: { FileManager.default.fileExists(atPath: $0.path) },
+            fileExists: { FileManager.default.fileExists(atPath: $0.path) },
             writeConfig: { contents, url in
                 try FileManager.default.createDirectory(
                     at: url.deletingLastPathComponent(),
@@ -233,6 +267,12 @@ extension SetupCommand {
                 )
                 try contents.write(to: url, atomically: true, encoding: .utf8)
             },
+            removeFile: { url in
+                if FileManager.default.fileExists(atPath: url.path) {
+                    try FileManager.default.removeItem(at: url)
+                }
+            },
+            stateFiles: StatePaths.all(),
             agentManager: .system()
         )
     }

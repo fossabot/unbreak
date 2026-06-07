@@ -35,6 +35,26 @@ curl -fsSL https://raw.githubusercontent.com/OWNER/ccfix/main/install.sh | bash
 
 See [`docs/RELEASING.md`](docs/RELEASING.md) for the tap setup and release flow.
 
+## Uninstall
+
+`ccfix uninstall` tears down everything ccfix writes to your machine — the login
+watcher, logs, the undo socket, and the config file (pass `--keep-config` to keep
+the latter). It then prints how to remove the binary itself:
+
+```sh
+ccfix uninstall                 # remove all ccfix state
+ccfix uninstall --keep-config   # …but leave the config in place
+```
+
+To also remove the binary, follow the printed instruction for your install
+method — `brew uninstall ccfix` for the Homebrew tap, or for the curl install:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/OWNER/ccfix/main/uninstall.sh | bash
+```
+
+(The curl uninstaller runs `ccfix uninstall` for you and then deletes the binary.)
+
 ## Layout
 
 ```
@@ -45,6 +65,7 @@ Sources/Setup       setup wizard + per-user LaunchAgent (PRD v2 §8.2)
 Tests/              swift-testing unit + property + corpus tests (§6.8, §13)
 Formula/ccfix.rb    Homebrew formula (PRD v2 §9)
 install.sh          curl|bash fallback installer (PRD v2 §9)
+uninstall.sh        curl|bash uninstaller — state teardown + binary (PRD v2 §9)
 docs/               PRDs + release flow
 archive/            reference Python implementation + original plist/README
 ```
