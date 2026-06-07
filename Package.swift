@@ -2,52 +2,52 @@
 import PackageDescription
 
 let package = Package(
-    name: "ccfix",
+    name: "unbreak",
     platforms: [.macOS(.v13)],
     products: [
-        .executable(name: "ccfix", targets: ["ccfix"]),
-        .library(name: "CCFixCore", targets: ["CCFixCore"]),
+        .executable(name: "unbreak", targets: ["unbreak"]),
+        .library(name: "UnbreakCore", targets: ["UnbreakCore"]),
     ],
     targets: [
         // Pure, deterministic repair pipeline (PRD v2 §6). No I/O, no globals.
-        .target(name: "CCFixCore"),
+        .target(name: "UnbreakCore"),
         // NSPasteboard-backed clipboard, behind a testable protocol (PRD v2 §7.2).
         .target(name: "Clipboard"),
         // Watch-mode event loop + app-context detection (PRD v2 §7.4).
         .target(
             name: "Watch",
-            dependencies: ["CCFixCore", "Clipboard"]
+            dependencies: ["UnbreakCore", "Clipboard"]
         ),
         // One-shot CLI surface: arg grammar + I/O driver, testable in isolation
         // from a real terminal/NSPasteboard (PRD v2 §8.1).
         .target(
             name: "CLI",
-            dependencies: ["CCFixCore", "Clipboard", "Watch"]
+            dependencies: ["UnbreakCore", "Clipboard", "Watch"]
         ),
-        // User config: config.toml reader + CCFIX_* env overrides (PRD v2 §8.3).
+        // User config: config.toml reader + UNBREAK_* env overrides (PRD v2 §8.3).
         .target(
             name: "Config",
-            dependencies: ["CCFixCore"]
+            dependencies: ["UnbreakCore"]
         ),
         // Setup wizard + per-user LaunchAgent lifecycle (PRD v2 §8.2, §7.4).
         .target(
             name: "Setup",
-            dependencies: ["CCFixCore", "Config"]
+            dependencies: ["UnbreakCore", "Config"]
         ),
         // Thin executable shim around CLI (§8.1) + the watch daemon (§7).
         .executableTarget(
-            name: "ccfix",
-            dependencies: ["CCFixCore", "Clipboard", "Watch", "CLI", "Config", "Setup"]
+            name: "unbreak",
+            dependencies: ["UnbreakCore", "Clipboard", "Watch", "CLI", "Config", "Setup"]
         ),
         .testTarget(
-            name: "CCFixCoreTests",
-            dependencies: ["CCFixCore"]
+            name: "UnbreakCoreTests",
+            dependencies: ["UnbreakCore"]
         ),
         // §13 validation: a file-based fixture corpus proving zero watch-mode
         // mutations on normal copies, plus golden repair captures per §5 case type.
         .testTarget(
             name: "CorpusTests",
-            dependencies: ["CCFixCore"],
+            dependencies: ["UnbreakCore"],
             resources: [.copy("Fixtures")]
         ),
         .testTarget(
@@ -56,19 +56,19 @@ let package = Package(
         ),
         .testTarget(
             name: "WatchTests",
-            dependencies: ["Watch", "Clipboard", "CCFixCore"]
+            dependencies: ["Watch", "Clipboard", "UnbreakCore"]
         ),
         .testTarget(
             name: "CLITests",
-            dependencies: ["CLI", "CCFixCore", "Clipboard", "Watch"]
+            dependencies: ["CLI", "UnbreakCore", "Clipboard", "Watch"]
         ),
         .testTarget(
             name: "ConfigTests",
-            dependencies: ["Config", "CCFixCore"]
+            dependencies: ["Config", "UnbreakCore"]
         ),
         .testTarget(
             name: "SetupTests",
-            dependencies: ["Setup", "CCFixCore", "Config"]
+            dependencies: ["Setup", "UnbreakCore", "Config"]
         ),
     ]
 )

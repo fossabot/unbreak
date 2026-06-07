@@ -1,4 +1,4 @@
-import CCFixCore
+import UnbreakCore
 import Foundation
 
 #if canImport(AppKit)

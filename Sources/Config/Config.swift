@@ -1,12 +1,12 @@
-import CCFixCore
+import UnbreakCore
 import Foundation
 
-/// User configuration for `ccfix` (PRD v2 §8.3).
+/// User configuration for `unbreak` (PRD v2 §8.3).
 ///
 /// Resolved from three layers, lowest precedence first:
 ///   1. built-in defaults (this struct's `init` defaults),
-///   2. `~/.config/ccfix/config.toml` (or `$XDG_CONFIG_HOME/ccfix/config.toml`),
-///   3. `CCFIX_*` environment variables.
+///   2. `~/.config/unbreak/config.toml` (or `$XDG_CONFIG_HOME/unbreak/config.toml`),
+///   3. `UNBREAK_*` environment variables.
 ///
 /// The fields are already typed and validated; projections (`gateConfig`,
 /// `pollInterval`) hand them to the watch daemon (§7). The discrete gate rules
@@ -51,13 +51,13 @@ public struct CCFixConfig: Equatable, Sendable {
         Double(pollIntervalMilliseconds) / 1000
     }
 
-    /// A fully-commented sample for `ccfix --init`/the setup wizard and the docs.
+    /// A fully-commented sample for `unbreak --init`/the setup wizard and the docs.
     /// Every key shown is the built-in default, so copying it changes nothing.
     public static let sampleTOML = """
-        # ~/.config/ccfix/config.toml — ccfix configuration (PRD v2 §8.3)
+        # ~/.config/unbreak/config.toml — unbreak configuration (PRD v2 §8.3)
         # Every value below is the built-in default; uncomment to override.
-        # Env vars (CCFIX_TERMINALS, CCFIX_POLL_INTERVAL_MS, CCFIX_WRAP_PROFILE,
-        # CCFIX_MAX_CLIPBOARD_BYTES, CCFIX_SHELL_SIGNAL_SCORE, CCFIX_STRUCTURE_RISK)
+        # Env vars (UNBREAK_TERMINALS, UNBREAK_POLL_INTERVAL_MS, UNBREAK_WRAP_PROFILE,
+        # UNBREAK_MAX_CLIPBOARD_BYTES, UNBREAK_SHELL_SIGNAL_SCORE, UNBREAK_STRUCTURE_RISK)
         # take precedence over this file.
 
         # Frontmost-app bundle ids watch mode will act in (gate 1, §7.1).

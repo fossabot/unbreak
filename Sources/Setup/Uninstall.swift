@@ -1,8 +1,8 @@
 import Config
 import Foundation
 
-/// `ccfix uninstall` — the counterpart to `setup`/`install-agent` (PRD v2 §8.2,
-/// §9). It removes everything ccfix *writes* to the user's machine and then tells
+/// `unbreak uninstall` — the counterpart to `setup`/`install-agent` (PRD v2 §8.2,
+/// §9). It removes everything unbreak *writes* to the user's machine and then tells
 /// the user how to remove the binary itself.
 ///
 /// The binary is reported rather than deleted on purpose: the process doing the
@@ -11,7 +11,7 @@ import Foundation
 /// from under either would be surprising — so we hand the last step back to the
 /// user with the exact command for their install method.
 extension SetupCommand {
-    /// Tear down ccfix state: the login LaunchAgent, the watch logs, the undo
+    /// Tear down unbreak state: the login LaunchAgent, the watch logs, the undo
     /// socket, and (unless `keepConfig`) the config file. Reports each path
     /// touched and finishes with binary-removal guidance. Returns a non-zero exit
     /// code only if a removal that should have succeeded failed.
@@ -27,7 +27,7 @@ extension SetupCommand {
             failures.append(agent.message)
         }
 
-        // 2. State files the daemon creates: ~/Library/Logs/ccfix*.log and the
+        // 2. State files the daemon creates: ~/Library/Logs/unbreak*.log and the
         //    undo socket. Absent files are skipped, not reported as work.
         for url in environment.stateFiles where environment.fileExists(url) {
             remove(url, environment: environment, removed: &removed, failures: &failures)
@@ -70,25 +70,25 @@ extension SetupCommand {
         environment: Environment
     ) {
         if removed.isEmpty {
-            environment.writeStdout("No ccfix state files were present.\n")
+            environment.writeStdout("No unbreak state files were present.\n")
         } else {
             let lines = removed.map { "  • \($0)" }.joined(separator: "\n")
             environment.writeStdout("Removed:\n\(lines)\n")
         }
         for failure in failures {
-            environment.writeStderr("ccfix: \(failure)\n")
+            environment.writeStderr("unbreak: \(failure)\n")
         }
     }
 
-    /// The closing instruction: how to remove the `ccfix` binary itself. We can't
+    /// The closing instruction: how to remove the `unbreak` binary itself. We can't
     /// do it for the user (see the type doc), so we resolve the running binary's
     /// path and print the right command for how it was installed.
     static func binaryGuidance(environment: Environment) -> String {
         guard let path = environment.agentManager.binaryPath(), !path.isEmpty else {
             return """
 
-                The binary itself was left in place. Remove it with `brew uninstall ccfix`
-                (Homebrew) or by deleting the `ccfix` executable on your PATH.
+                The binary itself was left in place. Remove it with `brew uninstall unbreak`
+                (Homebrew) or by deleting the `unbreak` executable on your PATH.
 
                 """
         }
@@ -98,7 +98,7 @@ extension SetupCommand {
             return """
 
                 The binary is Homebrew-managed (\(path)). Finish removing it with:
-                    brew uninstall ccfix
+                    brew uninstall unbreak
 
                 """
         }
@@ -111,7 +111,7 @@ extension SetupCommand {
     }
 }
 
-/// The well-known locations of ccfix-created state, mirrored here so the Setup
+/// The well-known locations of unbreak-created state, mirrored here so the Setup
 /// module can clean them up without depending on the Watch module that writes
 /// them. Keep in sync with `WatchLog.defaultLog` and `UndoSocketPath.defaultURL`
 /// (both §7); the config path defers to `ConfigLoader.defaultConfigURL` (§8.3).
@@ -124,11 +124,11 @@ public enum StatePaths {
         let logs = home.appendingPathComponent("Library/Logs", isDirectory: true)
         return [
             // The daemon's structured decision log (§7.3) …
-            logs.appendingPathComponent("ccfix.log"),
+            logs.appendingPathComponent("unbreak.log"),
             // … and the LaunchAgent's stdout/stderr redirect (§7.4).
-            logs.appendingPathComponent("ccfix.watch.log"),
+            logs.appendingPathComponent("unbreak.watch.log"),
             // The undo control socket (§7.1).
-            home.appendingPathComponent("Library/Application Support/ccfix/undo.sock"),
+            home.appendingPathComponent("Library/Application Support/unbreak/undo.sock"),
         ]
     }
 }

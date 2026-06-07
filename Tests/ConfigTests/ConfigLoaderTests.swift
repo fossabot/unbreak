@@ -1,4 +1,4 @@
-import CCFixCore
+import UnbreakCore
 import Testing
 
 @testable import Config
@@ -111,7 +111,7 @@ struct ConfigLoaderTests {
         #expect(loaded.warnings.contains { $0.contains(ConfigLoader.EnvKey.pollIntervalMs) })
     }
 
-    @Test("An empty CCFIX_TERMINALS is ignored with a warning")
+    @Test("An empty UNBREAK_TERMINALS is ignored with a warning")
     func emptyTerminalsEnv() {
         let loaded = ConfigLoader.resolve(
             tomlText: nil,
@@ -138,7 +138,7 @@ struct ConfigLoaderTests {
     @Test("XDG_CONFIG_HOME redirects the config path")
     func xdgPath() {
         let url = ConfigLoader.defaultConfigURL(environment: ["XDG_CONFIG_HOME": "/tmp/cfg"])
-        #expect(url.path == "/tmp/cfg/ccfix/config.toml")
+        #expect(url.path == "/tmp/cfg/unbreak/config.toml")
     }
 
     @Test("The bundled sample is valid TOML and resolves cleanly")

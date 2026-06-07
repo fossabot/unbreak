@@ -1,11 +1,11 @@
-import CCFixCore
+import UnbreakCore
 import Config
 import Foundation
 
 /// The setup-family subcommands (PRD v2 §8.2): the install wizard and the
 /// LaunchAgent lifecycle commands.
 ///
-/// These sit *in front of* the one-shot `CLI` grammar: `ccfix setup` must not be
+/// These sit *in front of* the one-shot `CLI` grammar: `unbreak setup` must not be
 /// read as "repair the literal text `setup`". `parse` therefore returns `nil` for
 /// anything that is not a setup-family command, letting the executable fall
 /// through to `CLI.parse`. The run driver's I/O is injected via `Environment` so
@@ -13,14 +13,14 @@ import Foundation
 public enum SetupCommand {
     /// A recognized setup-family invocation, or a usage error for one.
     public enum Parsed: Equatable {
-        /// `ccfix setup [--enable-agent]`. `enableAgent` forces the watcher on
+        /// `unbreak setup [--enable-agent]`. `enableAgent` forces the watcher on
         /// without prompting (for scripted installs).
         case setup(enableAgent: Bool)
-        /// `ccfix install-agent`.
+        /// `unbreak install-agent`.
         case installAgent
-        /// `ccfix uninstall-agent`.
+        /// `unbreak uninstall-agent`.
         case uninstallAgent
-        /// `ccfix uninstall [--keep-config]`. Tear down every trace of ccfix
+        /// `unbreak uninstall [--keep-config]`. Tear down every trace of unbreak
         /// *state* — the login LaunchAgent, logs, and the undo socket, plus the
         /// config file unless `keepConfig`. The binary is reported, not deleted
         /// (a running, possibly Homebrew-managed binary can't safely remove
@@ -99,7 +99,7 @@ extension SetupCommand {
         public var writeConfig: (_ contents: String, _ url: URL) throws -> Void
         /// Removes the file at `url` (used by uninstall); a missing file is fine.
         public var removeFile: (_ url: URL) throws -> Void
-        /// The ccfix-created state files uninstall should clean up beyond the
+        /// The unbreak-created state files uninstall should clean up beyond the
         /// config and LaunchAgent: the watch logs and the undo socket (§7.1, §7.3).
         public var stateFiles: [URL]
         public var agentManager: LaunchAgentManager
@@ -141,7 +141,7 @@ extension SetupCommand {
         case .uninstall(let keepConfig):
             return runUninstall(keepConfig: keepConfig, environment: environment)
         case .error(let message):
-            environment.writeStderr("ccfix: \(message)\n")
+            environment.writeStderr("unbreak: \(message)\n")
             return 2
         }
     }
@@ -157,8 +157,8 @@ extension SetupCommand {
         guard enable else {
             environment.writeStdout(
                 """
-                Watcher left off. Enable it any time with `ccfix install-agent`
-                (or re-run `ccfix setup`). One-shot `ccfix` still works regardless.
+                Watcher left off. Enable it any time with `unbreak install-agent`
+                (or re-run `unbreak setup`). One-shot `unbreak` still works regardless.
 
                 """
             )
@@ -216,7 +216,7 @@ extension SetupCommand {
             environment.writeStdout("Wrote \(environment.configURL.path).\n\n")
         } catch {
             environment.writeStderr(
-                "ccfix: could not write \(environment.configURL.path): \(error)\n"
+                "unbreak: could not write \(environment.configURL.path): \(error)\n"
             )
         }
     }
@@ -283,7 +283,7 @@ extension SetupCommand {
     public static func configContents(terminals: Set<String>) -> String {
         let array = terminals.sorted().map { "\"\($0)\"" }.joined(separator: ", ")
         return """
-            # ccfix configuration — written by `ccfix setup`.
+            # unbreak configuration — written by `unbreak setup`.
             # The active line below was filled in from detected terminals; the
             # commented defaults that follow document every other available option.
             terminals = [\(array)]

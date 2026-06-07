@@ -3,7 +3,7 @@ import Watch
 
 @testable import CLI
 
-@Suite("`ccfix undo` subcommand (PRD v2 §7.1)")
+@Suite("`unbreak undo` subcommand (PRD v2 §7.1)")
 struct UndoCommandTests {
     /// Captures what the run driver wrote, with a stubbed undo outcome.
     private final class Capture {

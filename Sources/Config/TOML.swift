@@ -9,7 +9,7 @@ public enum TOMLValue: Equatable, Sendable {
     case array([TOMLValue])
 }
 
-/// A deliberately small TOML reader covering exactly the slice `ccfix`'s config
+/// A deliberately small TOML reader covering exactly the slice `unbreak`'s config
 /// schema needs (PRD v2 §8.3): `# comments`, `[table]` headers, and one
 /// `key = value` per line where a value is a string, integer, float, boolean, or
 /// a single-line array of those. It is **not** a general TOML implementation —

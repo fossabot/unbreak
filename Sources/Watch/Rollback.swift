@@ -4,7 +4,7 @@ import Foundation
 ///
 /// Watch mode rewrites the clipboard in place, which would otherwise be
 /// destructive: a misfire loses the user's original copy. `RollbackStore` keeps
-/// the **one** most recent pre-mutation original so `ccfix undo` can put it back.
+/// the **one** most recent pre-mutation original so `unbreak undo` can put it back.
 /// It is deliberately tiny and dumb — one slot, no persistence, no history:
 ///
 ///  - `record(_:)` stashes the original *before* a mutation overwrites it.
@@ -55,7 +55,7 @@ public final class RollbackStore: @unchecked Sendable {
 ///
 /// This is the seam between the wire protocol and the actual clipboard write. The
 /// restore **must** be performed by the daemon (through its own `Clipboard`, via
-/// the injected closure) rather than by the `ccfix undo` process: the daemon's
+/// the injected closure) rather than by the `unbreak undo` process: the daemon's
 /// self-write suppression (`Clipboard.isSelfWrite` / `Watcher.poll`) would treat
 /// an undo-process write as a fresh external copy and immediately re-repair it,
 /// reverting the undo. Routing the write back through the daemon records it as a

@@ -1,6 +1,6 @@
-# ccfix
+# unbreak
 
-> Working name. Repairs terminal-wrapped clipboard commands from grid-renderer
+> Repairs terminal-wrapped clipboard commands from grid-renderer
 > agent CLIs (Claude Code, Gemini CLI, Codex CLI) so they paste as clean,
 > runnable shell commands. macOS only.
 
@@ -17,53 +17,53 @@ repairs exactly the copied fragment. (Background: PRD v2 §1.)
 ## Install
 
 Primary path is a Homebrew tap (builds from source — needs the Xcode Command Line
-Tools). Replace `OWNER` with the real handle once the tap repo exists (§9).
+Tools). The tap lives at `bart-turczynski/homebrew-tap` (§9).
 
 ```sh
-brew install OWNER/tap/ccfix
+brew install bart-turczynski/tap/unbreak
 ```
 
-`brew install` only puts the `ccfix` CLI on your `PATH`. The clipboard watcher is
-**off until you opt in** — enable it at login with `brew services start ccfix`, or
-run the guided `ccfix setup`.
+`brew install` only puts the `unbreak` CLI on your `PATH`. The clipboard watcher is
+**off until you opt in** — enable it at login with `brew services start unbreak`, or
+run the guided `unbreak setup`.
 
 No Homebrew? Use the fallback installer (builds from source the same way):
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/OWNER/ccfix/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/bart-turczynski/unbreak/main/install.sh | bash
 ```
 
 See [`docs/RELEASING.md`](docs/RELEASING.md) for the tap setup and release flow.
 
 ## Uninstall
 
-`ccfix uninstall` tears down everything ccfix writes to your machine — the login
+`unbreak uninstall` tears down everything unbreak writes to your machine — the login
 watcher, logs, the undo socket, and the config file (pass `--keep-config` to keep
 the latter). It then prints how to remove the binary itself:
 
 ```sh
-ccfix uninstall                 # remove all ccfix state
-ccfix uninstall --keep-config   # …but leave the config in place
+unbreak uninstall                 # remove all unbreak state
+unbreak uninstall --keep-config   # …but leave the config in place
 ```
 
 To also remove the binary, follow the printed instruction for your install
-method — `brew uninstall ccfix` for the Homebrew tap, or for the curl install:
+method — `brew uninstall unbreak` for the Homebrew tap, or for the curl install:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/OWNER/ccfix/main/uninstall.sh | bash
+curl -fsSL https://raw.githubusercontent.com/bart-turczynski/unbreak/main/uninstall.sh | bash
 ```
 
-(The curl uninstaller runs `ccfix uninstall` for you and then deletes the binary.)
+(The curl uninstaller runs `unbreak uninstall` for you and then deletes the binary.)
 
 ## Layout
 
 ```
-Sources/CCFixCore   pure, deterministic repair pipeline (PRD v2 §6)
-Sources/ccfix       thin CLI shell (PRD v2 §8.1)
+Sources/UnbreakCore   pure, deterministic repair pipeline (PRD v2 §6)
+Sources/unbreak       thin CLI shell (PRD v2 §8.1)
 Sources/Watch       opt-in fix-on-copy daemon + gates (PRD v2 §7)
 Sources/Setup       setup wizard + per-user LaunchAgent (PRD v2 §8.2)
 Tests/              swift-testing unit + property + corpus tests (§6.8, §13)
-Formula/ccfix.rb    Homebrew formula (PRD v2 §9)
+Formula/unbreak.rb    Homebrew formula (PRD v2 §9)
 install.sh          curl|bash fallback installer (PRD v2 §9)
 uninstall.sh        curl|bash uninstaller — state teardown + binary (PRD v2 §9)
 docs/               PRDs + release flow
@@ -94,8 +94,8 @@ brew install swift-format swiftlint
 ## Try it
 
 ```sh
-pbpaste | swift run ccfix -      # repair clipboard text, print to stdout
-swift run ccfix --help
+pbpaste | swift run unbreak -      # repair clipboard text, print to stdout
+swift run unbreak --help
 ```
 
 ## Status

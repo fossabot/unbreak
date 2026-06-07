@@ -40,4 +40,4 @@ clean:
 
 # Run the CLI against stdin, e.g.: pbpaste | make run
 run:
-	swift run ccfix -
+	swift run unbreak -

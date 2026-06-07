@@ -1,6 +1,6 @@
 import Testing
 
-@testable import CCFixCore
+@testable import UnbreakCore
 
 @Suite("Merge-artifact split (PRD v2 §6.5, lossy / off by default)")
 struct MergeSplitTests {

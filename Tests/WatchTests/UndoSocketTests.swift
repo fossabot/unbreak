@@ -7,12 +7,12 @@ import Testing
 struct UndoSocketTests {
     /// A unique socket path inside a dedicated temp subdirectory — short enough to
     /// stay under the 104-byte `sun_path` limit, and a directory the server may
-    /// safely chmod to 0700 (mirroring production's owned `ccfix/` dir, rather than
+    /// safely chmod to 0700 (mirroring production's owned `unbreak/` dir, rather than
     /// the shared `$TMPDIR` itself).
     private func tempSocketURL() -> URL {
         let dir = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent(
-                "ccfix-undo-\(UInt32.random(in: 0..<UInt32.max))",
+                "unbreak-undo-\(UInt32.random(in: 0..<UInt32.max))",
                 isDirectory: true
             )
         return dir.appendingPathComponent("u.sock")

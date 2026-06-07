@@ -1,4 +1,4 @@
-import CCFixCore
+import UnbreakCore
 import Clipboard
 import Foundation
 
@@ -6,17 +6,17 @@ import Foundation
 ///
 /// This module is deliberately split from the executable so the argument
 /// grammar (`parse`) and the I/O driver (`runOneShot`) are unit-testable without
-/// touching a real terminal or `NSPasteboard`. The `ccfix` executable is a thin
+/// touching a real terminal or `NSPasteboard`. The `unbreak` executable is a thin
 /// shim that wires `parse` to stdout/stderr/clipboard and dispatches the watch
 /// daemon (§7), which owns its own run loop and lives outside this surface.
 public enum CLI {
     /// Where the text to repair comes from.
     public enum Source: Equatable {
-        /// `ccfix` — read the clipboard and rewrite it in place (the default).
+        /// `unbreak` — read the clipboard and rewrite it in place (the default).
         case clipboard
-        /// `ccfix "text"` — repair the argument; the result goes to the clipboard.
+        /// `unbreak "text"` — repair the argument; the result goes to the clipboard.
         case literal(String)
-        /// `ccfix -` — stdin → stdout; never touches the clipboard.
+        /// `unbreak -` — stdin → stdout; never touches the clipboard.
         case stdin
     }
 
@@ -55,33 +55,33 @@ public enum CLI {
     }
 
     public static let helpText = """
-        ccfix — repair terminal-wrapped clipboard commands (PRD v2 §8.1)
+        unbreak — repair terminal-wrapped clipboard commands (PRD v2 §8.1)
 
         USAGE:
-          ccfix                       fix clipboard in place (default)
-          ccfix "text"                fix an argument, write result to clipboard
-          ccfix -                     stdin -> stdout (never touches clipboard)
-          ccfix --no-copy             print result + confidence, do not write (preview)
-          ccfix --join-all            aggressive full-collapse fallback
-          ccfix --width N             force the wrap column
-          ccfix --split-padding-artifacts
+          unbreak                       fix clipboard in place (default)
+          unbreak "text"                fix an argument, write result to clipboard
+          unbreak -                     stdin -> stdout (never touches clipboard)
+          unbreak --no-copy             print result + confidence, do not write (preview)
+          unbreak --join-all            aggressive full-collapse fallback
+          unbreak --width N             force the wrap column
+          unbreak --split-padding-artifacts
                                       enable the lossy merge-artifact split (§6.5)
 
         WATCH MODE (opt-in, §7) — fixes the clipboard hands-free on copy, but ONLY
         when every gate passes (allowlisted terminal frontmost, plain text, small,
         repaired, strong shell signal, no structure-risk veto):
-          ccfix --watch               run the fix-on-copy daemon (mutates clipboard)
-          ccfix --dry-run-watch       run the daemon log-only — never mutates (§7.2)
-          ccfix undo                  restore the clipboard to before the last auto-fix
+          unbreak --watch               run the fix-on-copy daemon (mutates clipboard)
+          unbreak --dry-run-watch       run the daemon log-only — never mutates (§7.2)
+          unbreak undo                  restore the clipboard to before the last auto-fix
                                       (asks the running watcher; single-slot, §7.1)
 
         SETUP & LOGIN WATCHER (§8.2) — the watcher is OFF until you opt in here:
-          ccfix setup                 interactive: detect terminals, write config,
+          unbreak setup                 interactive: detect terminals, write config,
                                       prompt to enable the watcher at login
-          ccfix setup --enable-agent  non-interactive setup that forces the watcher on
-          ccfix install-agent         install + start the per-user login LaunchAgent
-          ccfix uninstall-agent       stop + remove the login LaunchAgent
-          ccfix uninstall             remove all ccfix state (agent, logs, socket,
+          unbreak setup --enable-agent  non-interactive setup that forces the watcher on
+          unbreak install-agent         install + start the per-user login LaunchAgent
+          unbreak uninstall-agent       stop + remove the login LaunchAgent
+          unbreak uninstall             remove all unbreak state (agent, logs, socket,
                                       config); pass --keep-config to spare the config.
                                       Reports how to remove the binary itself.
         """
@@ -259,21 +259,21 @@ public enum CLI {
         // would needlessly bump the system change count, §7.4). A literal fragment
         // was handed to us explicitly, so it is always deposited.
         if case .clipboard = source, !result.report.changed {
-            environment.writeStderr("ccfix: clipboard already clean, nothing to do\n")
+            environment.writeStderr("unbreak: clipboard already clean, nothing to do\n")
         } else {
             clipboard.write(result.text)
         }
         return 0
     }
 
-    private static let noClipboardMessage = "ccfix: no clipboard available on this platform\n"
+    private static let noClipboardMessage = "unbreak: no clipboard available on this platform\n"
 
     /// A one-line, content-free confidence summary for `--no-copy` previews. It
     /// reports the repair signals (§6.7) but never the payload itself.
     static func confidenceSummary(_ report: RepairReport) -> String {
         let width = report.detectedWidth.map(String.init) ?? "?"
         return """
-            ccfix: changed=\(report.changed ? "yes" : "no") \
+            unbreak: changed=\(report.changed ? "yes" : "no") \
             wrap-confidence=\(format(report.wrapColumnConfidence)) \
             shell-signal=\(format(report.shellSignalScore)) \
             structure-risk=\(format(report.structureRisk)) \

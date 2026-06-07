@@ -13,9 +13,9 @@ import Foundation
 /// `LaunchAgentManager`.
 public enum LaunchAgent {
     /// The LaunchAgent label / plist basename. Generic reverse-DNS, **not** a
-    /// personal identifier (§7.4). `ccfix` is the placeholder name pending §11;
-    /// the final name fixes this value alongside the binary and tap repo.
-    public static let label = "io.ccfix.watch"
+    /// personal identifier (§7.4). Derived from the resolved tool name (§11),
+    /// alongside the binary and tap repo.
+    public static let label = "io.unbreak.watch"
 
     /// The launchd program-arguments tail appended after the binary path: run the
     /// watcher in its mutating, fix-on-copy mode (§7).
@@ -25,7 +25,7 @@ public enum LaunchAgent {
     ///
     /// - Parameters:
     ///   - label: the launchd label (also the plist basename).
-    ///   - binaryPath: absolute path to the `ccfix` executable to launch.
+    ///   - binaryPath: absolute path to the `unbreak` executable to launch.
     ///   - standardOutPath: file the agent's stdout+stderr are redirected to.
     /// - Returns: a complete, well-formed plist document.
     ///
@@ -61,7 +61,7 @@ public enum LaunchAgent {
                 <true/>
 
                 <!-- Process stdout/stderr (the structured decision log is separate:
-                     ~/Library/Logs/ccfix.log, written by the daemon itself, §7.3). -->
+                     ~/Library/Logs/unbreak.log, written by the daemon itself, §7.3). -->
                 <key>StandardOutPath</key>
                 <string>\(xmlEscape(standardOutPath))</string>
                 <key>StandardErrorPath</key>
@@ -91,7 +91,7 @@ public enum LaunchAgent {
     }
 }
 
-/// Installs, removes, and reports on the `ccfix` LaunchAgent (§8.2).
+/// Installs, removes, and reports on the `unbreak` LaunchAgent (§8.2).
 ///
 /// Every side effect — locating the binary, writing the plist, invoking
 /// `launchctl`, and removing the file — is injected, so `install`/`uninstall` can
@@ -112,7 +112,7 @@ public struct LaunchAgentManager {
     public var launchAgentsDirectory: URL
     /// Where the daemon's stdout/stderr is redirected.
     public var standardOutPath: String
-    /// Resolves the absolute path of the `ccfix` binary to launch, or `nil` if it
+    /// Resolves the absolute path of the `unbreak` binary to launch, or `nil` if it
     /// cannot be determined (in which case install refuses rather than guessing).
     public var binaryPath: () -> String?
     /// Writes `contents` to `url`; throws on failure.
@@ -160,7 +160,7 @@ public struct LaunchAgentManager {
     public func install() -> Outcome {
         guard let path = binaryPath(), !path.isEmpty else {
             return Outcome(
-                message: "ccfix: could not resolve the ccfix binary path; agent not installed",
+                message: "unbreak: could not resolve the unbreak binary path; agent not installed",
                 exitCode: 1
             )
         }
@@ -170,7 +170,7 @@ public struct LaunchAgentManager {
             try writeFile(document, plistURL)
         } catch {
             return Outcome(
-                message: "ccfix: failed to write \(plistURL.path): \(error)",
+                message: "unbreak: failed to write \(plistURL.path): \(error)",
                 exitCode: 1
             )
         }
@@ -181,7 +181,7 @@ public struct LaunchAgentManager {
         guard status == 0 else {
             return Outcome(
                 message: """
-                    ccfix: wrote the plist but `launchctl bootstrap` failed (status \(status)).
+                    unbreak: wrote the plist but `launchctl bootstrap` failed (status \(status)).
                     Try `launchctl bootstrap \(domain) \(plistURL.path)`, or log out and back in.
                     """,
                 exitCode: 1
@@ -189,9 +189,9 @@ public struct LaunchAgentManager {
         }
         return Outcome(
             message: """
-                ccfix: watcher LaunchAgent installed (\(LaunchAgent.label)) and started.
+                unbreak: watcher LaunchAgent installed (\(LaunchAgent.label)) and started.
                 It runs at login and fixes the clipboard on copy only when every gate passes.
-                Remove it any time with `ccfix uninstall-agent`.
+                Remove it any time with `unbreak uninstall-agent`.
                 """,
             exitCode: 0
         )
@@ -206,14 +206,15 @@ public struct LaunchAgentManager {
             try removeFile(plistURL)
         } catch {
             return Outcome(
-                message: "ccfix: failed to remove \(plistURL.path): \(error)",
+                message: "unbreak: failed to remove \(plistURL.path): \(error)",
                 exitCode: 1
             )
         }
         let message =
             existed
-            ? "ccfix: watcher LaunchAgent removed (\(LaunchAgent.label)); it will not run at login."
-            : "ccfix: no watcher LaunchAgent was installed; nothing to do."
+            ? "unbreak: watcher LaunchAgent removed (\(LaunchAgent.label)); "
+                + "it will not run at login."
+            : "unbreak: no watcher LaunchAgent was installed; nothing to do."
         return Outcome(message: message, exitCode: 0)
     }
 }
@@ -229,7 +230,7 @@ extension LaunchAgentManager {
         let logs = home.appendingPathComponent("Library/Logs", isDirectory: true)
         return LaunchAgentManager(
             launchAgentsDirectory: agents,
-            standardOutPath: logs.appendingPathComponent("ccfix.watch.log").path,
+            standardOutPath: logs.appendingPathComponent("unbreak.watch.log").path,
             binaryPath: resolveBinaryPath,
             writeFile: { contents, url in
                 try FileManager.default.createDirectory(

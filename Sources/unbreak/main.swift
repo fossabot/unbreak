@@ -1,4 +1,4 @@
-import CCFixCore
+import UnbreakCore
 import CLI
 import Clipboard
 import Config
@@ -17,7 +17,7 @@ import AppKit
 
 let loaded = ConfigLoader.load()
 for warning in loaded.warnings {
-    FileHandle.standardError.write(Data("ccfix: \(warning)\n".utf8))
+    FileHandle.standardError.write(Data("unbreak: \(warning)\n".utf8))
 }
 let config = loaded.config
 
@@ -30,7 +30,7 @@ if let command = SetupCommand.parse(argv) {
     exit(SetupCommand.run(command, environment: SetupCommand.systemEnvironment()))
 }
 
-// `ccfix undo` is likewise a verb, not literal text to repair: it asks the running
+// `unbreak undo` is likewise a verb, not literal text to repair: it asks the running
 // daemon to restore the pre-fix clipboard over the undo socket (§7.1).
 if let command = UndoCommand.parse(argv) {
     exit(UndoCommand.run(command, environment: UndoCommand.systemEnvironment()))
@@ -42,7 +42,7 @@ case .help:
     exit(0)
 
 case .error(let message):
-    FileHandle.standardError.write(Data("ccfix: \(message)\n".utf8))
+    FileHandle.standardError.write(Data("unbreak: \(message)\n".utf8))
     exit(2)
 
 case .run(let arguments):
@@ -88,7 +88,7 @@ func runWatchDaemon(dryRun: Bool, options: RepairOptions, config: CCFixConfig) -
             undoServer = server
         } catch {
             FileHandle.standardError.write(
-                Data("ccfix: `ccfix undo` unavailable — \(error)\n".utf8)
+                Data("unbreak: `unbreak undo` unavailable — \(error)\n".utf8)
             )
         }
     }
@@ -97,12 +97,12 @@ func runWatchDaemon(dryRun: Bool, options: RepairOptions, config: CCFixConfig) -
     watcher.start(pollInterval: config.pollInterval)
     let mode = dryRun ? "dry-run (log-only)" : "active (mutating)"
     FileHandle.standardError.write(
-        Data("ccfix: watch mode \(mode); logging to ~/Library/Logs/ccfix.log\n".utf8)
+        Data("unbreak: watch mode \(mode); logging to ~/Library/Logs/unbreak.log\n".utf8)
     )
     RunLoop.main.run()
     exit(0)
     #else
-    FileHandle.standardError.write(Data("ccfix: watch mode requires macOS\n".utf8))
+    FileHandle.standardError.write(Data("unbreak: watch mode requires macOS\n".utf8))
     exit(1)
     #endif
 }

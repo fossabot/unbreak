@@ -72,7 +72,7 @@ public enum WatchGate {
     }
 
     /// A single gate's result with a short, content-safe explanation suitable for
-    /// `~/Library/Logs/ccfix.log` (§7.3 — full clipboard contents are never logged).
+    /// `~/Library/Logs/unbreak.log` (§7.3 — full clipboard contents are never logged).
     public struct GateOutcome: Sendable, Equatable {
         public let gate: Gate
         public let passed: Bool

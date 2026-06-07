@@ -1,4 +1,4 @@
-import CCFixCore
+import UnbreakCore
 import Config
 import Foundation
 import Testing
@@ -63,7 +63,7 @@ private final class Harness {
     var configContents: String?
     var configPresent = false
     let backend = FakeAgentBackend()
-    let configURL = URL(fileURLWithPath: "/Users/x/.config/ccfix/config.toml")
+    let configURL = URL(fileURLWithPath: "/Users/x/.config/unbreak/config.toml")
     /// State files (logs, socket) that uninstall should clean up, and the set
     /// currently "present" on the fake filesystem.
     var stateFiles: [URL] = []
@@ -175,11 +175,11 @@ struct SetupRunTests {
     @Test("`uninstall` removes the agent, state files, and config")
     func uninstallRemovesEverything() {
         let harness = Harness()
-        harness.backend.binary = "/opt/homebrew/Cellar/ccfix/0.1.0/bin/ccfix"
+        harness.backend.binary = "/opt/homebrew/Cellar/unbreak/0.1.0/bin/unbreak"
         _ = backendInstall(harness)  // an agent is present to remove
         harness.configPresent = true
-        let log = URL(fileURLWithPath: "/Users/x/Library/Logs/ccfix.log")
-        let sock = URL(fileURLWithPath: "/Users/x/Library/Application Support/ccfix/undo.sock")
+        let log = URL(fileURLWithPath: "/Users/x/Library/Logs/unbreak.log")
+        let sock = URL(fileURLWithPath: "/Users/x/Library/Application Support/unbreak/undo.sock")
         harness.stateFiles = [log, sock]
         harness.present = [log.path, sock.path]
 
@@ -193,9 +193,9 @@ struct SetupRunTests {
         #expect(harness.removed.contains(log))
         #expect(harness.removed.contains(sock))
         #expect(harness.removed.contains(harness.configURL))
-        #expect(harness.stdout.contains("ccfix.log"))
+        #expect(harness.stdout.contains("unbreak.log"))
         // Homebrew-managed binary (the fake's default path) → brew uninstall hint.
-        #expect(harness.stdout.contains("brew uninstall ccfix"))
+        #expect(harness.stdout.contains("brew uninstall unbreak"))
     }
 
     @Test("`uninstall --keep-config` spares the config file")
@@ -222,15 +222,15 @@ struct SetupRunTests {
         )
         #expect(code == 0)
         #expect(harness.removed.isEmpty)
-        #expect(harness.stdout.contains("No ccfix state files were present"))
+        #expect(harness.stdout.contains("No unbreak state files were present"))
     }
 
     @Test("`uninstall` steers a non-Homebrew binary to a plain rm")
     func uninstallNonBrewBinary() {
         let harness = Harness()
-        harness.backend.binary = "/usr/local/bin/ccfix"
+        harness.backend.binary = "/usr/local/bin/unbreak"
         _ = SetupCommand.run(.uninstall(keepConfig: false), environment: harness.environment())
-        #expect(harness.stdout.contains("rm /usr/local/bin/ccfix"))
+        #expect(harness.stdout.contains("rm /usr/local/bin/unbreak"))
         #expect(!harness.stdout.contains("brew uninstall"))
     }
 

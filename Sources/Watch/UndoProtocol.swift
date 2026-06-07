@@ -1,8 +1,8 @@
 import Foundation
 
-/// The `ccfix undo` IPC request (PRD v2 §7.1).
+/// The `unbreak undo` IPC request (PRD v2 §7.1).
 ///
-/// Sent by the `ccfix undo` client to the running daemon. Intentionally minimal:
+/// Sent by the `unbreak undo` client to the running daemon. Intentionally minimal:
 /// a single command verb. Clipboard content **never** crosses the wire — the
 /// restore is performed daemon-side — keeping the channel consistent with the
 /// content-safety contract (§7.3).

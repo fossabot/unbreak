@@ -8,32 +8,32 @@ struct LaunchAgentPlistTests {
     @Test("Plist embeds the binary path, --watch, and a generic label")
     func plistContents() {
         let xml = LaunchAgent.plist(
-            binaryPath: "/opt/homebrew/bin/ccfix",
-            standardOutPath: "/Users/x/Library/Logs/ccfix.watch.log"
+            binaryPath: "/opt/homebrew/bin/unbreak",
+            standardOutPath: "/Users/x/Library/Logs/unbreak.watch.log"
         )
-        #expect(xml.contains("<string>io.ccfix.watch</string>"))
-        #expect(xml.contains("<string>/opt/homebrew/bin/ccfix</string>"))
+        #expect(xml.contains("<string>io.unbreak.watch</string>"))
+        #expect(xml.contains("<string>/opt/homebrew/bin/unbreak</string>"))
         #expect(xml.contains("<string>--watch</string>"))
         #expect(xml.contains("<key>RunAtLoad</key>"))
         #expect(xml.contains("<key>KeepAlive</key>"))
-        #expect(xml.contains("<string>/Users/x/Library/Logs/ccfix.watch.log</string>"))
+        #expect(xml.contains("<string>/Users/x/Library/Logs/unbreak.watch.log</string>"))
     }
 
     @Test("Label carries no personal identifier (fixes the original plist)")
     func genericLabel() {
-        #expect(LaunchAgent.label == "io.ccfix.watch")
+        #expect(LaunchAgent.label == "io.unbreak.watch")
         #expect(!LaunchAgent.label.contains("/Users/"))
-        let xml = LaunchAgent.plist(binaryPath: "/usr/local/bin/ccfix", standardOutPath: "/tmp/o")
+        let xml = LaunchAgent.plist(binaryPath: "/usr/local/bin/unbreak", standardOutPath: "/tmp/o")
         #expect(!xml.lowercased().contains("bartturczynski"))
     }
 
     @Test("XML special characters in paths are escaped")
     func escaping() {
         let xml = LaunchAgent.plist(
-            binaryPath: "/Apps/A & B/ccfix",
+            binaryPath: "/Apps/A & B/unbreak",
             standardOutPath: "/logs/<weird>.log"
         )
-        #expect(xml.contains("/Apps/A &amp; B/ccfix"))
+        #expect(xml.contains("/Apps/A &amp; B/unbreak"))
         #expect(xml.contains("/logs/&lt;weird&gt;.log"))
         #expect(!xml.contains("A & B"))
     }
@@ -47,13 +47,13 @@ final class FakeAgentBackend {
     var removed: [URL] = []
     var present: Set<String> = []
     var bootstrapStatus: Int32 = 0
-    var binary: String? = "/opt/homebrew/bin/ccfix"
+    var binary: String? = "/opt/homebrew/bin/unbreak"
     var writeError: Error?
 
     func manager() -> LaunchAgentManager {
         LaunchAgentManager(
             launchAgentsDirectory: URL(fileURLWithPath: "/Users/x/Library/LaunchAgents"),
-            standardOutPath: "/Users/x/Library/Logs/ccfix.watch.log",
+            standardOutPath: "/Users/x/Library/Logs/unbreak.watch.log",
             binaryPath: { self.binary },
             writeFile: { contents, url in
                 if let writeError = self.writeError { throw writeError }
@@ -82,8 +82,8 @@ struct LaunchAgentManagerTests {
 
         #expect(outcome.exitCode == 0)
         #expect(backend.written.count == 1)
-        #expect(backend.written[0].1.lastPathComponent == "io.ccfix.watch.plist")
-        #expect(backend.written[0].0.contains("/opt/homebrew/bin/ccfix"))
+        #expect(backend.written[0].1.lastPathComponent == "io.unbreak.watch.plist")
+        #expect(backend.written[0].0.contains("/opt/homebrew/bin/unbreak"))
         // bootout (idempotent re-install) precedes bootstrap.
         #expect(backend.launchctlCalls[0][0] == "bootout")
         #expect(backend.launchctlCalls[1][0] == "bootstrap")

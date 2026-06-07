@@ -1,6 +1,6 @@
 import Testing
 
-@testable import CCFixCore
+@testable import UnbreakCore
 
 @Suite("Confidence signals (PRD v2 §6.7, §7 gates 5/6)")
 struct SignalsTests {

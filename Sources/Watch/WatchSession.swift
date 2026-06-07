@@ -1,4 +1,4 @@
-import CCFixCore
+import UnbreakCore
 import Foundation
 
 /// The opt-in fix-on-copy daemon's decision-and-act loop (PRD v2 §7).
@@ -119,7 +119,7 @@ public final class WatchSession {
             return .wouldMutate
         }
 
-        // Stash the original before overwriting it, so `ccfix undo` can restore it.
+        // Stash the original before overwriting it, so `unbreak undo` can restore it.
         rollback.record(evaluation.original)
         watcher.applyMutation(evaluation.repaired)
         return .mutated

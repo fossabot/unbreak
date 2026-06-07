@@ -1,4 +1,4 @@
-import CCFixCore
+import UnbreakCore
 import Clipboard
 import Testing
 
@@ -197,7 +197,7 @@ struct CLIRunTests {
         var args = CLI.Arguments(source: .stdin)
         args.options.forcedWidth = 80
         // Just assert it runs cleanly with the option set; repair semantics are
-        // covered exhaustively in CCFixCoreTests.
+        // covered exhaustively in UnbreakCoreTests.
         #expect(CLI.runOneShot(args, environment: cap.environment()) == 0)
     }
 

@@ -1,10 +1,10 @@
 import Foundation
 import Watch
 
-/// The `ccfix undo` subcommand (PRD v2 §7.1).
+/// The `unbreak undo` subcommand (PRD v2 §7.1).
 ///
 /// Sits *in front of* the one-shot `CLI` grammar — like the setup-family verbs in
-/// `SetupCommand` — so `ccfix undo` is never read as "repair the literal text
+/// `SetupCommand` — so `unbreak undo` is never read as "repair the literal text
 /// `undo`". `parse` returns `nil` for anything that is not `undo`, letting the
 /// executable fall through to `CLI.parse`.
 ///
@@ -16,7 +16,7 @@ import Watch
 public enum UndoCommand {
     /// A recognized `undo` invocation, or a usage error for one.
     public enum Parsed: Equatable {
-        /// `ccfix undo`.
+        /// `unbreak undo`.
         case undo
         /// A usage error; printed to stderr, exit code 2.
         case error(String)
@@ -60,7 +60,7 @@ extension UndoCommand {
         case .undo:
             return runUndo(environment: environment)
         case .error(let message):
-            environment.writeStderr("ccfix: \(message)\n")
+            environment.writeStderr("unbreak: \(message)\n")
             return 2
         }
     }
@@ -69,25 +69,26 @@ extension UndoCommand {
         switch environment.requestUndo() {
         case .restored:
             environment.writeStdout(
-                "ccfix: clipboard restored to the text before the last auto-fix.\n"
+                "unbreak: clipboard restored to the text before the last auto-fix.\n"
             )
             return 0
         case .empty:
             environment.writeStdout(
-                "ccfix: nothing to undo (no recent auto-fix, or it was cleared by a newer copy).\n"
+                "unbreak: nothing to undo (no recent auto-fix, or it was cleared "
+                + "by a newer copy).\n"
             )
             return 0
         case .noDaemon:
             environment.writeStderr(
                 """
-                ccfix: no running watcher to undo through.
-                Start it with `ccfix --watch`, or enable it at login with `ccfix install-agent`.
+                unbreak: no running watcher to undo through.
+                Start it with `unbreak --watch`, or enable it at login with `unbreak install-agent`.
 
                 """
             )
             return 1
         case .error(let detail):
-            environment.writeStderr("ccfix: undo failed: \(detail)\n")
+            environment.writeStderr("unbreak: undo failed: \(detail)\n")
             return 1
         }
     }

@@ -1,4 +1,4 @@
-import CCFixCore
+import UnbreakCore
 import Foundation
 
 /// Content-safe observability for watch mode (PRD v2 §7.3).
@@ -36,7 +36,7 @@ extension WatchLog {
     }
 }
 
-/// Appends lines to `~/Library/Logs/ccfix.log` (PRD v2 §7.3, §8.3 — a real log
+/// Appends lines to `~/Library/Logs/unbreak.log` (PRD v2 §7.3, §8.3 — a real log
 /// file, not world-writable `/tmp`). Each `record` opens, appends, and closes so
 /// the file can be rotated or tailed without holding a handle open for the life
 /// of the daemon.
@@ -47,12 +47,12 @@ public final class FileLog: WatchLog {
         self.url = url
     }
 
-    /// The default location: `~/Library/Logs/ccfix.log`.
+    /// The default location: `~/Library/Logs/unbreak.log`.
     public static func defaultLog() -> FileLog {
         let logs = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Logs", isDirectory: true)
         try? FileManager.default.createDirectory(at: logs, withIntermediateDirectories: true)
-        return FileLog(url: logs.appendingPathComponent("ccfix.log"))
+        return FileLog(url: logs.appendingPathComponent("unbreak.log"))
     }
 
     public func record(_ line: String) {

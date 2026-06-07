@@ -1,6 +1,6 @@
 import Testing
 
-@testable import CCFixCore
+@testable import UnbreakCore
 
 @Suite("Repair pipeline (PRD v2 §6)")
 struct RepairTests {

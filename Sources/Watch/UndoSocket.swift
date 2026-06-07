@@ -6,7 +6,7 @@ import Darwin
 
 /// The on-disk location of the undo control socket (PRD v2 §7.1).
 ///
-/// `~/Library/Application Support/ccfix/undo.sock`, with the parent directory
+/// `~/Library/Application Support/unbreak/undo.sock`, with the parent directory
 /// locked to `0700` so only the user can connect. A Unix domain socket path is
 /// bounded by `sockaddr_un.sun_path` (104 bytes on Darwin) — short home paths fit
 /// comfortably, but the bind/connect helpers guard the limit rather than trust it.
@@ -15,7 +15,7 @@ public enum UndoSocketPath {
     public static func defaultURL(
         home: URL = FileManager.default.homeDirectoryForCurrentUser
     ) -> URL {
-        home.appendingPathComponent("Library/Application Support/ccfix/undo.sock")
+        home.appendingPathComponent("Library/Application Support/unbreak/undo.sock")
     }
 
     /// Create the socket's parent directory (if needed) and lock it to `0700`.
@@ -28,7 +28,7 @@ public enum UndoSocketPath {
 
 /// Errors raised while standing up or tearing down the listen socket. The client
 /// surfaces a connect failure as a value (`UndoOutcome.noDaemon`) rather than an
-/// error, since "no running watcher" is an ordinary outcome of `ccfix undo`.
+/// error, since "no running watcher" is an ordinary outcome of `unbreak undo`.
 public enum UndoSocketError: Error, Equatable {
     /// The socket path would overflow `sun_path` (104 bytes incl. terminator).
     case pathTooLong(Int)
@@ -113,7 +113,7 @@ final class FileDescriptorConnection: UndoConnection {
     }
 }
 
-/// The Unix-domain-socket listener that exposes the undo channel to `ccfix undo`
+/// The Unix-domain-socket listener that exposes the undo channel to `unbreak undo`
 /// (PRD v2 §7.1).
 ///
 /// The daemon is the server: it owns the rollback buffer in memory, and the
@@ -202,7 +202,7 @@ public final class UndoSocketServer: @unchecked Sendable {
     }
 }
 
-/// The result of an `ccfix undo` round-trip (PRD v2 §7.1).
+/// The result of an `unbreak undo` round-trip (PRD v2 §7.1).
 public enum UndoOutcome: Equatable, Sendable {
     /// The daemon restored the pre-fix clipboard.
     case restored
@@ -214,7 +214,7 @@ public enum UndoOutcome: Equatable, Sendable {
     case error(String)
 }
 
-/// The `ccfix undo` client: connect to the daemon's socket, send `{command:undo}`,
+/// The `unbreak undo` client: connect to the daemon's socket, send `{command:undo}`,
 /// and report the daemon's status (PRD v2 §7.1).
 ///
 /// A connect failure is reported as `.noDaemon` (the watcher is not running),

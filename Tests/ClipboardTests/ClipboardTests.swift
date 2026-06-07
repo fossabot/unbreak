@@ -78,7 +78,7 @@ struct SystemPasteboardTests {
     /// user's real clipboard and never race each other (swift-testing runs tests
     /// in parallel — a shared named pasteboard corrupts under concurrent writes).
     private func scratch(_ name: String) -> NSPasteboard {
-        let pb = NSPasteboard(name: NSPasteboard.Name("net.tidio.ccfix.tests.\(name)"))
+        let pb = NSPasteboard(name: NSPasteboard.Name("net.tidio.unbreak.tests.\(name)"))
         pb.clearContents()
         return pb
     }

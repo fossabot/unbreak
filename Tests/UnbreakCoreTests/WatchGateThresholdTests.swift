@@ -1,6 +1,6 @@
 import Testing
 
-@testable import CCFixCore
+@testable import UnbreakCore
 
 /// The optional float-threshold overrides for gates 5/6 (PRD v2 §8.3). These use
 /// the explicit-`analysis` overload so `Shell.score` / `Structure.risk` can be

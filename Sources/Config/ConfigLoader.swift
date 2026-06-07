@@ -1,7 +1,7 @@
-import CCFixCore
+import UnbreakCore
 import Foundation
 
-/// Loads `CCFixConfig` from the config file and `CCFIX_*` environment overrides
+/// Loads `CCFixConfig` from the config file and `UNBREAK_*` environment overrides
 /// (PRD v2 §8.3).
 ///
 /// Loading is **forgiving by design**: a malformed file, an unknown key, or an
@@ -21,14 +21,14 @@ public enum ConfigLoader {
         }
     }
 
-    /// Recognized `CCFIX_*` environment override names.
+    /// Recognized `UNBREAK_*` environment override names.
     public enum EnvKey {
-        public static let terminals = "CCFIX_TERMINALS"
-        public static let pollIntervalMs = "CCFIX_POLL_INTERVAL_MS"
-        public static let wrapProfile = "CCFIX_WRAP_PROFILE"
-        public static let maxClipboardBytes = "CCFIX_MAX_CLIPBOARD_BYTES"
-        public static let shellSignalScore = "CCFIX_SHELL_SIGNAL_SCORE"
-        public static let structureRisk = "CCFIX_STRUCTURE_RISK"
+        public static let terminals = "UNBREAK_TERMINALS"
+        public static let pollIntervalMs = "UNBREAK_POLL_INTERVAL_MS"
+        public static let wrapProfile = "UNBREAK_WRAP_PROFILE"
+        public static let maxClipboardBytes = "UNBREAK_MAX_CLIPBOARD_BYTES"
+        public static let shellSignalScore = "UNBREAK_SHELL_SIGNAL_SCORE"
+        public static let structureRisk = "UNBREAK_STRUCTURE_RISK"
     }
 
     // Recognized TOML keys (flattened — see `TOML.parse`).
@@ -264,8 +264,8 @@ public enum ConfigLoader {
 
     // MARK: - Filesystem entry point
 
-    /// The config file path: `$XDG_CONFIG_HOME/ccfix/config.toml` when that env
-    /// var is set and non-empty, else `~/.config/ccfix/config.toml` (§8.3).
+    /// The config file path: `$XDG_CONFIG_HOME/unbreak/config.toml` when that env
+    /// var is set and non-empty, else `~/.config/unbreak/config.toml` (§8.3).
     public static func defaultConfigURL(
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> URL {
@@ -275,7 +275,7 @@ public enum ConfigLoader {
         } else {
             base = NSHomeDirectory() + "/.config"
         }
-        return URL(fileURLWithPath: base).appendingPathComponent("ccfix/config.toml")
+        return URL(fileURLWithPath: base).appendingPathComponent("unbreak/config.toml")
     }
 
     /// Load the config from disk + environment. A missing file is normal and

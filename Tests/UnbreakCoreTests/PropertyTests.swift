@@ -1,6 +1,6 @@
 import Testing
 
-@testable import CCFixCore
+@testable import UnbreakCore
 
 /// Lightweight property tests (PRD v2 §6.8, §13) — no external dependency, to
 /// keep the build self-contained. A seeded generator makes failures reproducible.

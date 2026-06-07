@@ -1,6 +1,6 @@
 import Testing
 
-@testable import CCFixCore
+@testable import UnbreakCore
 
 @Suite("Heredoc detection / protected regions (PRD v2 §6.4)")
 struct HeredocTests {

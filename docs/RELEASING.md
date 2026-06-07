@@ -1,25 +1,25 @@
-# Releasing ccfix (PRD v2 §9)
+# Releasing unbreak (PRD v2 §9)
 
 Distribution is a **Homebrew tap** (primary) with a `curl … | bash` **fallback**
 ([`install.sh`](../install.sh)). Both build from source — no bottles yet (§12).
 
-Throughout, replace the `OWNER` placeholder with the real GitHub handle. It
-appears in [`Formula/ccfix.rb`](../Formula/ccfix.rb) (`homepage`, `url`) and in
-`install.sh` (`CCFIX_REPO` default). The tap lives in a **separate** repo,
-`OWNER/homebrew-tap`, with the formula at `Formula/ccfix.rb`.
+The GitHub handle is `bart-turczynski`. It appears in
+[`Formula/unbreak.rb`](../Formula/unbreak.rb) (`homepage`, `url`) and in
+`install.sh` (`UNBREAK_REPO` default). The tap lives in a **separate** repo,
+`bart-turczynski/homebrew-tap`, with the formula at `Formula/unbreak.rb`.
 
 ## One-time tap setup
 
-1. Create a public repo `OWNER/homebrew-tap`.
-2. Copy `Formula/ccfix.rb` into it at `Formula/ccfix.rb`.
+1. Create a public repo `bart-turczynski/homebrew-tap`.
+2. Copy `Formula/unbreak.rb` into it at `Formula/unbreak.rb`.
 3. Users then install with:
 
    ```sh
-   brew install OWNER/tap/ccfix
+   brew install bart-turczynski/tap/unbreak
    ```
 
    `brew install` only puts the CLI on `PATH`; the watcher is off until the user
-   opts in (`brew services start ccfix` or `ccfix setup`). The formula's
+   opts in (`brew services start unbreak` or `unbreak setup`). The formula's
    `caveats` says so.
 
 ## Cutting a release
@@ -34,20 +34,20 @@ appears in [`Formula/ccfix.rb`](../Formula/ccfix.rb) (`homepage`, `url`) and in
 2. **Get the tarball digest.** GitHub serves a source tarball per tag:
 
    ```sh
-   curl -fsSL https://github.com/OWNER/ccfix/archive/refs/tags/v0.1.0.tar.gz \
+   curl -fsSL https://github.com/bart-turczynski/unbreak/archive/refs/tags/v0.1.0.tar.gz \
      | shasum -a 256
    ```
 
-3. **Bump the formula** in `OWNER/homebrew-tap` — change `version`, `url`, and
+3. **Bump the formula** in `bart-turczynski/homebrew-tap` — change `version`, `url`, and
    `sha256` together. The explicit `version` means users only update on a bump,
    not on every `brew update`.
 
 4. **Verify locally** before pushing the formula:
 
    ```sh
-   brew install --build-from-source ./Formula/ccfix.rb
-   brew test ccfix          # runs the stdin-repair test block
-   brew style ./Formula/ccfix.rb
+   brew install --build-from-source ./Formula/unbreak.rb
+   brew test unbreak          # runs the stdin-repair test block
+   brew style ./Formula/unbreak.rb
    ```
 
 5. **Commit + push** the formula bump to the tap repo.
@@ -59,11 +59,11 @@ For users without Homebrew, `install.sh` fetches the tagged tarball, builds
 `--enable-watch` is passed:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/OWNER/ccfix/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/bart-turczynski/unbreak/main/install.sh | bash
 ```
 
 The LaunchAgent is never templated with a hardcoded path: when enabled, the
-binary's own `ccfix install-agent` resolves its absolute path and writes the
+binary's own `unbreak install-agent` resolves its absolute path and writes the
 per-user plist (§7.4, §8.2).
 
 ## Later (§12)

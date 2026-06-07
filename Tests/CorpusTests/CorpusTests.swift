@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import CCFixCore
+@testable import UnbreakCore
 
 /// PRD v2 §13 validation suite.
 ///

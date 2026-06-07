@@ -1,6 +1,6 @@
 import Testing
 
-@testable import CCFixCore
+@testable import UnbreakCore
 
 @Suite("Display-cell width (PRD v2 §6.1, §13)")
 struct DisplayWidthTests {

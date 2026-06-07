@@ -1,6 +1,6 @@
 import Testing
 
-@testable import CCFixCore
+@testable import UnbreakCore
 
 @Suite("Watch-mode gate pipeline (PRD v2 §7)")
 struct WatchGateTests {
