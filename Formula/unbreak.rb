@@ -16,9 +16,9 @@ class Unbreak < Formula
   # only on a bump, not on every tap refresh.
   url "https://github.com/bart-turczynski/unbreak/archive/refs/tags/v0.1.0.tar.gz"
   version "0.1.0"
-  # Placeholder — replace with the tarball's real digest on release:
-  #   shasum -a 256 unbreak-0.1.0.tar.gz
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+  # Digest of the v0.1.0 source tarball (see docs/RELEASING.md):
+  #   curl -fsSL .../v0.1.0.tar.gz | shasum -a 256
+  sha256 "65c8915d341e8b8ad5678d9e156143af87360ffc6a9f3780695849db522cdcb3"
   license "MIT"
 
   depends_on :macos
