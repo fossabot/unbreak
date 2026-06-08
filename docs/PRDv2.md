@@ -241,9 +241,11 @@ following gates must pass before any mutation:
      cluster (`-x` / `--long`), or a quoted path.
 6. **Structure-risk veto.** Do **not** mutate — even when 5 passes — if any of
    these fire: markdown markers dominate (`- ` / `* ` / `# ` / `1. ` at multiple
-   line starts), stack-trace patterns (`at …(file:line)`, `File "…", line N`), or
-   a prose ratio (most lines end in `.`/`!`/`?` with high alpha-to-symbol ratio
-   and no operators). "When in doubt, don't act" → the §2 zero-mutation target.
+   line starts), stack-trace patterns (`at …(file:line)`, `File "…", line N`), a
+   prose ratio (most lines end in `.`/`!`/`?` with high alpha-to-symbol ratio and
+   no operators), or a box-drawing table/panel (≥2 lines carrying U+2500–U+259F
+   glyphs — its uniform-width rows otherwise read as wrapped command lines to §6.3
+   and smush). "When in doubt, don't act" → the §2 zero-mutation target.
 
 If all gates pass: **in-place clipboard mutation** is the intended behavior (the
 whole point) — the wrapped string representation is replaced. Documented
@@ -371,7 +373,8 @@ prominently.
 
 - **Fixture corpus (must yield zero watch-mode mutations):** clean prose, markdown
   lists, shell heredocs, JSON, YAML, Makefiles, Python indentation, stack traces,
-  URLs, CJK text, emoji, tabs, ANSI escapes, OSC52 sequences, pager output, plus
+  box-drawing tables/panels, URLs, CJK text, emoji, tabs, ANSI escapes, OSC52
+  sequences, pager output, plus
   raw mangled captures (watcher off) per tool × the §5 case types (long wrap,
   inline, multi-line `\`, heredoc, long token, nested+merge).
 - **Property tests:** idempotence (§6.8), lossless-on-clean-input, and structure

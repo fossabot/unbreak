@@ -5,7 +5,8 @@ import Foundation
 ///
 /// `shell(_:)` implements the discrete shell-signal tiers (gate 5): the gate passes
 /// iff there is ≥1 strong signal OR ≥2 weak signals. `structure(_:)` implements the
-/// structure-risk veto (gate 6): markdown dominance, stack traces, or a prose ratio.
+/// structure-risk veto (gate 6): markdown dominance, stack traces, a prose ratio, or
+/// box-drawing tables/panels.
 ///
 /// The pure repair pipeline records the derived 0…1 floats (`shellSignalScore`,
 /// `structureRisk`) in the `RepairReport` for logging and power-user thresholds; the
@@ -57,11 +58,30 @@ public enum Signals {
         public let markdownDominant: Bool
         public let stackTrace: Bool
         public let prose: Bool
+        /// Box-drawing table / panel chrome (Claude Code result boxes, `gh`/`npm`
+        /// tables). Its uniform-width rows are indistinguishable from wrapped command
+        /// lines to §6.3 rejoin, so a copy of one would smush into a single line —
+        /// the §11 borked-table regression. See `containsBoxDrawing`.
+        public let tabular: Bool
         /// 0…1 risk estimate for logging/overrides; ≥0.5 whenever a veto fires.
         public let risk: Double
 
-        /// Any one of the three patterns vetoes a watch-mode mutation (§7 gate 6).
-        public var vetoes: Bool { markdownDominant || stackTrace || prose }
+        /// Any one of the four patterns vetoes a watch-mode mutation (§7 gate 6).
+        public var vetoes: Bool { markdownDominant || stackTrace || prose || tabular }
+
+        public init(
+            markdownDominant: Bool,
+            stackTrace: Bool,
+            prose: Bool,
+            tabular: Bool = false,
+            risk: Double
+        ) {
+            self.markdownDominant = markdownDominant
+            self.stackTrace = stackTrace
+            self.prose = prose
+            self.tabular = tabular
+            self.risk = risk
+        }
     }
 
     // MARK: - Combined analysis (for the watch-mode gates, §7)
@@ -88,7 +108,13 @@ public enum Signals {
         let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         let nonBlank = lines.filter { !$0.allSatisfy { $0 == " " || $0 == "\t" } }
         guard !nonBlank.isEmpty else {
-            return Structure(markdownDominant: false, stackTrace: false, prose: false, risk: 0)
+            return Structure(
+                markdownDominant: false,
+                stackTrace: false,
+                prose: false,
+                tabular: false,
+                risk: 0
+            )
         }
         let total = Double(nonBlank.count)
 
@@ -112,15 +138,25 @@ public enum Signals {
             && !text.contains("`")
         let prose = sentenceFraction >= 0.5 && alphaRatio(text) >= 0.7 && noOperators
 
+        // Box-drawing tables / panels: ≥2 rows carrying box-drawing glyphs. One
+        // border line alone can never be smushed (rejoin needs ≥2 same-width lines),
+        // so the ≥2 threshold targets exactly the dangerous shape while ignoring an
+        // incidental lone glyph.
+        let boxLines = nonBlank.filter(containsBoxDrawing).count
+        let boxFraction = Double(boxLines) / total
+        let tabular = boxLines >= 2
+
         let mdScore = markdownDominant ? max(0.6, mdFraction) : mdFraction
         let stackScore = stackTrace ? max(0.6, stackFraction) : stackFraction * 0.5
         let proseScore = prose ? max(0.6, sentenceFraction) : sentenceFraction * 0.4
-        let risk = min(1.0, max(mdScore, max(stackScore, proseScore)))
+        let boxScore = tabular ? max(0.6, boxFraction) : boxFraction
+        let risk = min(1.0, max(mdScore, max(stackScore, max(proseScore, boxScore))))
 
         return Structure(
             markdownDominant: markdownDominant,
             stackTrace: stackTrace,
             prose: prose,
+            tabular: tabular,
             risk: risk
         )
     }
@@ -237,6 +273,14 @@ public enum Signals {
             if rest.hasPrefix(". ") { return true }
         }
         return false
+    }
+
+    /// A line carrying any box-drawing (U+2500–U+257F) or block-element
+    /// (U+2580–U+259F) scalar — the glyphs TUIs draw tables, panels, and bars with.
+    /// They never occur in a runnable shell command, so any such line is structural
+    /// chrome, not a wrapped command.
+    static func containsBoxDrawing(_ line: String) -> Bool {
+        line.unicodeScalars.contains { (0x2500...0x259F).contains($0.value) }
     }
 
     static func looksLikeAtFrame(_ line: String) -> Bool {
