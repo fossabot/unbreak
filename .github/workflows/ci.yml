@@ -7,9 +7,13 @@ on:
 
 jobs:
   build-test:
-    runs-on: macos-14
+    # Package.swift declares `swift-tools-version: 6.3`, and the suite uses the
+    # `Testing` framework (Swift 6+). The macos-26 image ships Xcode 26.x (Swift
+    # 6.3.x) by default; macos-14/15 only reach Swift 5.10/6.0–6.2 and fail the
+    # tools-version check.
+    runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Show Swift version
         run: swift --version
