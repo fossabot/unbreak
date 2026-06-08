@@ -1,0 +1,21 @@
+Crawl submitted as an async job (whole site, fast HTML mode, free beta).
+
+┌────────┬──────────────────────────────────────┐
+│        │                                      │
+├────────┼──────────────────────────────────────┤
+│ Job ID │ 612e7dd2-cf2f-4d78-83e1-18b6f0b1edf2 │
+├────────┼──────────────────────────────────────┤
+│ URL    │ https://www.tidio.com/               │
+├────────┼──────────────────────────────────────┤
+│ Mode   │ Fast HTML (free beta)                │
+├────────┼──────────────────────────────────────┤
+│ Limit  │ 100,000 pages                        │
+└────────┴──────────────────────────────────────┘
+
+A full-site crawl with no limit can take a while (potentially up to an
+hour for a large site). Follow-up commands:
+
+npm run status -- 612e7dd2-cf2f-4d78-83e1-18b6f0b1edf2
+npm run download -- 612e7dd2-cf2f-4d78-83e1-18b6f0b1edf2
+npm run download -- 612e7dd2-cf2f-4d78-83e1-18b6f0b1edf2 --format jsonl
+npm run jobs

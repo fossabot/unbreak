@@ -122,6 +122,28 @@ struct SignalsTests {
         #expect(!Signals.structure("git status\n- a stray dash").markdownDominant)
     }
 
+    @Test("A box-drawing table vetoes (§11 borked-table regression)")
+    func boxTableVetoes() {
+        let text = """
+            ┌────────┬──────────────────────────────────────┐
+            │ Job ID │ 612e7dd2-cf2f-4d78-83e1-18b6f0b1edf2 │
+            ├────────┼──────────────────────────────────────┤
+            │ URL    │ https://www.tidio.com/               │
+            └────────┴──────────────────────────────────────┘
+            """
+        let s = Signals.structure(text)
+        #expect(s.tabular)
+        #expect(s.vetoes)
+        #expect(s.risk >= 0.5)
+    }
+
+    @Test("A lone box-drawing glyph is not tabular (needs ≥2 rows to smush)")
+    func loneBoxGlyphNotTabular() {
+        // A single border line can't be rejoined into anything (needs ≥2 same-width
+        // lines), so one stray glyph must not trip the veto.
+        #expect(!Signals.structure("echo ───\nrm -rf build").tabular)
+    }
+
     // MARK: Integration with the RepairReport (§6.7)
 
     @Test("Report carries shell-signal score and structure risk")

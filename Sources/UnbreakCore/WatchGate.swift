@@ -11,7 +11,8 @@ import Foundation
 ///     §6.1 normalization (so a copy that merely contained escapes/CRLFs, with no
 ///     wrap to fix, is left untouched — `RepairReport.structuralChange`),
 ///  5. the shell-signal tier passes (≥1 strong OR ≥2 weak — §6.7 / `Signals.Shell.passesGate`),
-///  6. no structure-risk veto fires (markdown/stack-trace/prose — `Signals.Structure.vetoes`).
+///  6. no structure-risk veto fires (markdown/stack-trace/prose/table —
+///     `Signals.Structure.vetoes`).
 ///
 /// This function is **pure**: no `NSPasteboard`/`NSWorkspace` access lives here.
 /// The watcher plumbing (CLAU-bgouhgol) reads the frontmost bundle id and the
@@ -298,6 +299,7 @@ public enum WatchGate {
         if structure.markdownDominant { reasons.append("markdown") }
         if structure.stackTrace { reasons.append("stack-trace") }
         if structure.prose { reasons.append("prose") }
+        if structure.tabular { reasons.append("table") }
         return reasons.isEmpty ? "unknown" : reasons.joined(separator: "+")
     }
 }
