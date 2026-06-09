@@ -39,13 +39,23 @@ public enum WatchGate {
         /// veto rule. `nil` (the default) keeps the shipped discrete rule (§8.3).
         public var structureRiskThreshold: Double?
 
-        /// Default bundle ids for the §7 allowlist: cmux, Ghostty, iTerm2, Apple
-        /// Terminal. User-extensible via config/env (§8.3).
+        /// Default bundle ids for the §7 allowlist: the popular macOS terminal
+        /// emulators, so the common case works without any config. Every entry is a
+        /// terminal where pasting a shell command is the expected action, so seeding
+        /// them does not widen the safety boundary (gate 1 still keeps watch mode out
+        /// of browsers, editors, chat apps). User-extensible via config/env (§8.3).
         public static let defaultTerminalAllowlist: Set<String> = [
             "com.cmuxterm.app",  // cmux (confirmed bundle id via QA, §11)
             "com.mitchellh.ghostty",  // Ghostty
             "com.googlecode.iterm2",  // iTerm2
             "com.apple.Terminal",  // Apple Terminal
+            "net.kovidgoyal.kitty",  // Kitty
+            "dev.warp.Warp-Stable",  // Warp (stable channel)
+            "dev.warp.Warp-Preview",  // Warp (preview channel)
+            "org.alacritty",  // Alacritty
+            "com.github.wez.wezterm",  // WezTerm
+            "co.zeit.hyper",  // Hyper
+            "org.tabby",  // Tabby
         ]
 
         public init(
