@@ -103,6 +103,12 @@ extension SetupCommand {
         /// config and LaunchAgent: the watch logs and the undo socket (§7.1, §7.3).
         public var stateFiles: [URL]
         public var agentManager: LaunchAgentManager
+        /// Resolves symlinks in a filesystem path. Uninstall uses it to classify the
+        /// install method: a Homebrew binary reaches us as the PATH symlink
+        /// (`<prefix>/bin/unbreak`), which only reveals its `…/Cellar/…` keg once
+        /// dereferenced. Injectable so the classification is testable without a real
+        /// symlink on disk.
+        public var resolveSymlinks: (String) -> String
 
         public init(
             writeStdout: @escaping (String) -> Void,
@@ -114,7 +120,10 @@ extension SetupCommand {
             writeConfig: @escaping (_ contents: String, _ url: URL) throws -> Void,
             removeFile: @escaping (_ url: URL) throws -> Void,
             stateFiles: [URL],
-            agentManager: LaunchAgentManager
+            agentManager: LaunchAgentManager,
+            resolveSymlinks: @escaping (String) -> String = {
+                URL(fileURLWithPath: $0).resolvingSymlinksInPath().path
+            }
         ) {
             self.writeStdout = writeStdout
             self.writeStderr = writeStderr
@@ -126,6 +135,7 @@ extension SetupCommand {
             self.removeFile = removeFile
             self.stateFiles = stateFiles
             self.agentManager = agentManager
+            self.resolveSymlinks = resolveSymlinks
         }
     }
 
