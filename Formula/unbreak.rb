@@ -17,10 +17,10 @@ class Unbreak < Formula
   homepage "https://github.com/bart-turczynski/unbreak"
   # Source tarball for the tagged release. `version` is explicit so users update
   # only on a bump, not on every tap refresh.
-  url "https://github.com/bart-turczynski/unbreak/archive/refs/tags/v0.1.2.tar.gz"
-  version "0.1.2"
-  # Digest of the v0.1.2 source tarball (see docs/RELEASING.md):
-  #   curl -fsSL .../v0.1.2.tar.gz | shasum -a 256
+  url "https://github.com/bart-turczynski/unbreak/archive/refs/tags/v0.1.3.tar.gz"
+  version "0.1.3"
+  # Digest of the v0.1.3 source tarball (see docs/RELEASING.md):
+  #   curl -fsSL .../v0.1.3.tar.gz | shasum -a 256
   # NOTE: in *this* repo the formula ships inside the tarball it points at, so a
   # self-consistent source sha is impossible — the tap repo's copy carries the
   # real digest, and release.yml injects it for the bottle build. This value is a
