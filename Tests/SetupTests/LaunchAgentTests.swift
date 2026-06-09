@@ -49,6 +49,9 @@ final class FakeAgentBackend {
     var bootstrapStatus: Int32 = 0
     var binary: String? = "/opt/homebrew/bin/unbreak"
     var writeError: Error?
+    /// Whether `launchctl list homebrew.mxcl.unbreak` should report a loaded
+    /// brew-services watcher (exit 0). Off by default to match a plain install.
+    var brewServiceLoaded = false
 
     func manager() -> LaunchAgentManager {
         LaunchAgentManager(
@@ -67,7 +70,10 @@ final class FakeAgentBackend {
             fileExists: { self.present.contains($0.path) },
             runLaunchctl: { args in
                 self.launchctlCalls.append(args)
-                return args.first == "bootstrap" ? self.bootstrapStatus : 0
+                if args.first == "bootstrap" { return self.bootstrapStatus }
+                // `launchctl list <label>` exits 0 only when the label is loaded.
+                if args.first == "list" { return self.brewServiceLoaded ? 0 : 1 }
+                return 0  // bootout and friends
             }
         )
     }
@@ -126,5 +132,14 @@ struct LaunchAgentManagerTests {
         let outcome = backend.manager().uninstall()
         #expect(outcome.exitCode == 0)
         #expect(outcome.message.contains("nothing to do"))
+    }
+
+    @Test("brewServiceLoaded reflects `launchctl list` for the brew label")
+    func brewServiceDetection() {
+        let backend = FakeAgentBackend()
+        #expect(backend.manager().brewServiceLoaded() == false)
+        backend.brewServiceLoaded = true
+        #expect(backend.manager().brewServiceLoaded() == true)
+        #expect(backend.launchctlCalls.last == ["list", "homebrew.mxcl.unbreak"])
     }
 }

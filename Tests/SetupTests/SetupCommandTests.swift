@@ -209,6 +209,30 @@ struct SetupRunTests {
         #expect(!harness.stdout.contains("rm /opt/homebrew/bin/unbreak"))
     }
 
+    @Test("`uninstall` surfaces the brew-services watcher it can't itself stop")
+    func uninstallReportsBrewWatcher() {
+        let harness = Harness()
+        // No per-user agent installed, but a brew-services watcher is running — the
+        // exact state of a user who opted in via `brew services start unbreak`.
+        harness.backend.brewServiceLoaded = true
+
+        let code = SetupCommand.run(
+            .uninstall(keepConfig: false),
+            environment: harness.environment()
+        )
+
+        #expect(code == 0)
+        #expect(harness.stdout.contains("Homebrew-managed watcher is still running"))
+        #expect(harness.stdout.contains("brew services stop unbreak"))
+    }
+
+    @Test("`uninstall` stays quiet about brew when no brew watcher is loaded")
+    func uninstallNoBrewWatcherIsQuiet() {
+        let harness = Harness()  // brewServiceLoaded defaults to false
+        _ = SetupCommand.run(.uninstall(keepConfig: false), environment: harness.environment())
+        #expect(!harness.stdout.contains("brew services stop"))
+    }
+
     @Test("`uninstall --keep-config` spares the config file")
     func uninstallKeepsConfig() {
         let harness = Harness()
