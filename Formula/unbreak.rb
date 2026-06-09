@@ -36,8 +36,8 @@ class Unbreak < Formula
   # the binary hardcodes no Cellar path (links only system libs + the OS Swift
   # runtime).
   bottle do
-    root_url "https://github.com/bart-turczynski/unbreak/releases/download/v0.1.2"
-    sha256 cellar: :any_skip_relocation, arm64_ventura: "ab18f2de3b8bd7a98f691286c6f7c51e03d29d5bf559ae21514db07f222fce86"
+    root_url "https://github.com/bart-turczynski/unbreak/releases/download/v0.1.3"
+    sha256 cellar: :any_skip_relocation, arm64_ventura: "4230d224088571869904038a8e617576969fffab9fab7e3f48b318d1e9eef143"
   end
 
   depends_on :macos
