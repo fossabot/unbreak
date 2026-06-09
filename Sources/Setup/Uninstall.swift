@@ -92,9 +92,14 @@ extension SetupCommand {
 
                 """
         }
-        // Homebrew binaries live under `<prefix>/Cellar/...` (symlinked onto PATH);
-        // removing one by hand desyncs brew, so steer those users to `brew uninstall`.
-        if path.contains("/Cellar/") || path.contains("/Homebrew/") {
+        // Homebrew binaries live under `<prefix>/Cellar/...` but reach us as the
+        // `<prefix>/bin/unbreak` symlink on PATH — the running process's own path.
+        // The keg only shows in the *resolved* path, so dereference before testing:
+        // classifying on the raw symlink mislabels every tap install as a manual one
+        // and tells the user to `rm` the symlink, which desyncs brew (the keg and its
+        // receipt survive, so `brew install` then reports "already installed").
+        let resolved = environment.resolveSymlinks(path)
+        if resolved.contains("/Cellar/") || resolved.contains("/Homebrew/") {
             return """
 
                 The binary is Homebrew-managed (\(path)). Finish removing it with:

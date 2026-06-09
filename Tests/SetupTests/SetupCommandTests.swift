@@ -69,6 +69,9 @@ private final class Harness {
     var stateFiles: [URL] = []
     var present: Set<String> = []
     var removed: [URL] = []
+    /// Symlink → target overrides for the injected resolver; paths absent from the
+    /// map resolve to themselves (matching the real no-op for non-symlinks).
+    var symlinks: [String: String] = [:]
 
     func environment() -> SetupCommand.Environment {
         SetupCommand.Environment(
@@ -91,7 +94,8 @@ private final class Harness {
                 if url == self.configURL { self.configPresent = false }
             },
             stateFiles: stateFiles,
-            agentManager: backend.manager()
+            agentManager: backend.manager(),
+            resolveSymlinks: { self.symlinks[$0] ?? $0 }
         )
     }
 }
@@ -175,7 +179,12 @@ struct SetupRunTests {
     @Test("`uninstall` removes the agent, state files, and config")
     func uninstallRemovesEverything() {
         let harness = Harness()
-        harness.backend.binary = "/opt/homebrew/Cellar/unbreak/0.1.0/bin/unbreak"
+        // A tap install reaches us as the PATH symlink, not the keg path — the
+        // resolver must dereference it to see `/Cellar/` and pick the brew hint.
+        harness.backend.binary = "/opt/homebrew/bin/unbreak"
+        harness.symlinks = [
+            "/opt/homebrew/bin/unbreak": "/opt/homebrew/Cellar/unbreak/0.1.1/bin/unbreak"
+        ]
         _ = backendInstall(harness)  // an agent is present to remove
         harness.configPresent = true
         let log = URL(fileURLWithPath: "/Users/x/Library/Logs/unbreak.log")
@@ -194,8 +203,10 @@ struct SetupRunTests {
         #expect(harness.removed.contains(sock))
         #expect(harness.removed.contains(harness.configURL))
         #expect(harness.stdout.contains("unbreak.log"))
-        // Homebrew-managed binary (the fake's default path) → brew uninstall hint.
+        // Tap install (PATH symlink → keg) → brew uninstall hint, never a bare `rm`
+        // of the symlink (which would leave brew's keg + receipt behind).
         #expect(harness.stdout.contains("brew uninstall unbreak"))
+        #expect(!harness.stdout.contains("rm /opt/homebrew/bin/unbreak"))
     }
 
     @Test("`uninstall --keep-config` spares the config file")
