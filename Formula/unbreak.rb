@@ -37,7 +37,7 @@ class Unbreak < Formula
   # runtime).
   bottle do
     root_url "https://github.com/bart-turczynski/unbreak/releases/download/v0.1.2"
-    # sha256 cellar: :any_skip_relocation, arm64_ventura: "FILL_FROM_RELEASE_WORKFLOW"
+    sha256 cellar: :any_skip_relocation, arm64_ventura: "ab18f2de3b8bd7a98f691286c6f7c51e03d29d5bf559ae21514db07f222fce86"
   end
 
   depends_on :macos
