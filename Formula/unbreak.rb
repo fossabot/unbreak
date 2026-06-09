@@ -5,10 +5,13 @@
 #
 #   brew install bart-turczynski/tap/unbreak
 #
-# Builds from source (needs the Swift toolchain from the Xcode Command Line
-# Tools); pre-built bottles are a later optimization (§12). On each tagged
-# release, bump `version`, `url`, and `sha256` together (see docs/RELEASING.md) so
-# users only update on an explicit bump.
+# Installs come from a prebuilt **bottle** (see the `bottle do` block) so users
+# need no Swift toolchain. The `install` recipe below still builds from source —
+# it is both how the release workflow *produces* the bottle and the automatic
+# fallback for any platform without a matching bottle (then the Xcode Command
+# Line Tools are required). On each tagged release, bump `version`, `url`, and
+# `sha256` (source tarball) together, then paste the workflow-generated bottle
+# block — see docs/RELEASING.md.
 class Unbreak < Formula
   desc "Repair terminal-wrapped clipboard commands from TUI coding agents"
   homepage "https://github.com/bart-turczynski/unbreak"
@@ -20,6 +23,16 @@ class Unbreak < Formula
   #   curl -fsSL .../v0.1.1.tar.gz | shasum -a 256
   sha256 "804ea9784686e86cac068bea8b51e2193311c2a3f91bd972ae93a13156374782"
   license "MIT"
+
+  # Prebuilt binary, hosted as a GitHub release asset (see .github/workflows/
+  # release.yml). The `release.yml` job generates this block with the real
+  # cellar tag + sha256 on each tagged release; paste it here and in the tap.
+  # `:any_skip_relocation` is correct because the binary hardcodes no Cellar
+  # path — it links only system libraries + the OS Swift runtime.
+  bottle do
+    root_url "https://github.com/bart-turczynski/unbreak/releases/download/v0.1.1"
+    # sha256 cellar: :any_skip_relocation, arm64_tahoe: "FILL_FROM_RELEASE_WORKFLOW"
+  end
 
   depends_on :macos
 

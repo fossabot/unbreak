@@ -1,0 +1,86 @@
+name: Release (bottle)
+
+# Builds a Homebrew bottle (a prebuilt binary) on a tagged release so `brew
+# install` downloads the ~650KB binary instead of compiling from source — which
+# is what drags in the Xcode Command Line Tools. The bottle links only against
+# system libraries + the OS-shipped Swift runtime (macOS 13+), so it needs no
+# toolchain on the user's machine.
+#
+# The hashes inside a `bottle do` block can only exist after the bottle is built,
+# so this job *generates* that block (correct OS tag + sha256) and attaches it to
+# the release. The maintainer then pastes it into the tap formula — see
+# docs/RELEASING.md. The job uploads the bottle tarball as a release asset; the
+# formula's `root_url` points back at exactly that location.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write # create the release + upload the bottle asset
+
+jobs:
+  bottle:
+    # Must match CI: Package.swift is swift-tools-version 6.3 and the suite uses
+    # the Testing framework, which only the macos-26 image ships (Swift 6.3.x).
+    # The bottle is therefore tagged for that runner's arch+OS; older macOS (down
+    # to the Package's .macOS(.v13) floor) falls back to Homebrew's older-bottle
+    # reuse, then to the source build if no compatible bottle exists.
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Resolve tag/version
+        id: ver
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+
+      # The formula's source-tarball sha256 must already match this tag (bump it
+      # before tagging — see RELEASING.md). Build from a throwaway local tap so
+      # `brew bottle` has a tapped formula to work against.
+      - name: Stage formula in a local tap
+        run: |
+          brew tap-new local/unbreak --no-git
+          cp Formula/unbreak.rb "$(brew --repository local/unbreak)/Formula/unbreak.rb"
+
+      - name: Build the bottle
+        id: build
+        env:
+          ROOT_URL: https://github.com/${{ github.repository }}/releases/download/${{ steps.ver.outputs.tag }}
+        run: |
+          brew install --build-bottle local/unbreak/unbreak
+          brew bottle --json --no-rebuild --root-url="${ROOT_URL}" local/unbreak/unbreak
+          # `brew bottle` writes the file with a `--` separator; the formula and
+          # the hosted asset must use a single `-`. Rename to match.
+          for f in *--*.bottle.tar.gz; do
+            mv "$f" "${f/--/-}"
+          done
+          ls -1 *.bottle.tar.gz
+
+      - name: Generate the `bottle do` block
+        run: |
+          # `brew bottle --merge` turns the per-build JSON into the DSL block with
+          # the correct cellar/os tag and sha256. Captured into the job summary so
+          # it can be pasted into the tap formula verbatim.
+          brew bottle --merge --write --no-commit ./*.bottle.json || true
+          {
+            echo '## Bottle block — paste into the tap formula'
+            echo ''
+            echo '```ruby'
+            # The merged block is printed by --merge; also show the JSON as a
+            # fallback in case the runner's brew prints it differently.
+            cat ./*.bottle.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create / update the GitHub release with the bottle
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.ver.outputs.tag }}" \
+            --title "${{ steps.ver.outputs.tag }}" \
+            --generate-notes \
+            ./*.bottle.tar.gz \
+            || gh release upload "${{ steps.ver.outputs.tag }}" ./*.bottle.tar.gz --clobber
