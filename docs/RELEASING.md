@@ -70,11 +70,14 @@ the formula bump comes first, then the tag, then the workflow fills in the bottl
    To force-check the source path still works (the bottle's build recipe + the
    no-bottle fallback): `brew install --build-from-source ./Formula/unbreak.rb`.
 
-> **Architectures.** The bottle is built on the Apple-Silicon `macos-26` runner,
-> so it serves `arm64`. Homebrew reuses a bottle tagged for an older macOS on
-> newer releases, so one bottle covers macOS 13+ on Apple Silicon. Intel (`x86_64`)
-> users currently fall back to the source build; add an `x86_64` bottle (cross-build
-> or a universal `lipo`) if the team needs it.
+> **Architectures & OS coverage.** The bottle is built on the Apple-Silicon
+> `macos-26` runner, so it serves `arm64`. Homebrew only reuses a bottle on a
+> macOS release **at or newer than** the bottle's own tag — never older. So the
+> workflow relabels the tahoe-built bottle to the *oldest* supported tag,
+> `arm64_ventura` (matching `Package.swift` `.macOS(.v13)`); one file then serves
+> macOS 13+ on Apple Silicon. Intel (`x86_64`) users currently fall back to the
+> source build; add an `x86_64` bottle (cross-build or a universal `lipo`) if the
+> team needs it.
 
 ## Fallback installer
 

@@ -17,21 +17,27 @@ class Unbreak < Formula
   homepage "https://github.com/bart-turczynski/unbreak"
   # Source tarball for the tagged release. `version` is explicit so users update
   # only on a bump, not on every tap refresh.
-  url "https://github.com/bart-turczynski/unbreak/archive/refs/tags/v0.1.1.tar.gz"
-  version "0.1.1"
-  # Digest of the v0.1.1 source tarball (see docs/RELEASING.md):
-  #   curl -fsSL .../v0.1.1.tar.gz | shasum -a 256
+  url "https://github.com/bart-turczynski/unbreak/archive/refs/tags/v0.1.2.tar.gz"
+  version "0.1.2"
+  # Digest of the v0.1.2 source tarball (see docs/RELEASING.md):
+  #   curl -fsSL .../v0.1.2.tar.gz | shasum -a 256
+  # NOTE: in *this* repo the formula ships inside the tarball it points at, so a
+  # self-consistent source sha is impossible — the tap repo's copy carries the
+  # real digest, and release.yml injects it for the bottle build. This value is a
+  # placeholder until mirrored to the tap.
   sha256 "804ea9784686e86cac068bea8b51e2193311c2a3f91bd972ae93a13156374782"
   license "MIT"
 
   # Prebuilt binary, hosted as a GitHub release asset (see .github/workflows/
-  # release.yml). The `release.yml` job generates this block with the real
-  # cellar tag + sha256 on each tagged release; paste it here and in the tap.
-  # `:any_skip_relocation` is correct because the binary hardcodes no Cellar
-  # path — it links only system libraries + the OS Swift runtime.
+  # release.yml). The job builds on the macos-26 runner but relabels the bottle to
+  # the OLDEST supported macOS (arm64_ventura = Package.swift .macOS(.v13)) so
+  # newer systems reuse it — one file serves macOS 13+ on Apple Silicon. Paste the
+  # job-generated block here and in the tap. `:any_skip_relocation` is correct:
+  # the binary hardcodes no Cellar path (links only system libs + the OS Swift
+  # runtime).
   bottle do
-    root_url "https://github.com/bart-turczynski/unbreak/releases/download/v0.1.1"
-    # sha256 cellar: :any_skip_relocation, arm64_tahoe: "FILL_FROM_RELEASE_WORKFLOW"
+    root_url "https://github.com/bart-turczynski/unbreak/releases/download/v0.1.2"
+    # sha256 cellar: :any_skip_relocation, arm64_ventura: "FILL_FROM_RELEASE_WORKFLOW"
   end
 
   depends_on :macos
