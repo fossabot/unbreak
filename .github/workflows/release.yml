@@ -37,13 +37,28 @@ jobs:
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
 
-      # The formula's source-tarball sha256 must already match this tag (bump it
-      # before tagging — see RELEASING.md). Build from a throwaway local tap so
-      # `brew bottle` has a tapped formula to work against.
-      - name: Stage formula in a local tap
+      # Build from a throwaway local tap so `brew bottle` has a tapped formula to
+      # work against. The committed formula lives *inside* this repo's source
+      # tarball, so its `sha256` can't match that tarball (the field is part of
+      # what's hashed). Sidestep that by computing the tag tarball's real digest
+      # now and injecting url+sha into the tap copy only — the committed formula's
+      # source fields are irrelevant to the bottle build.
+      - name: Stage formula in a local tap with this tag's real source sha
+        env:
+          TAG: ${{ steps.ver.outputs.tag }}
+          REPO: ${{ github.repository }}
         run: |
+          url="https://github.com/${REPO}/archive/refs/tags/${TAG}.tar.gz"
+          sha="$(curl -fsSL "$url" | shasum -a 256 | awk '{print $1}')"
+          echo "Source tarball sha256: ${sha}"
           brew tap-new local/unbreak --no-git
-          cp Formula/unbreak.rb "$(brew --repository local/unbreak)/Formula/unbreak.rb"
+          dest="$(brew --repository local/unbreak)/Formula/unbreak.rb"
+          cp Formula/unbreak.rb "$dest"
+          # BSD sed (macOS runner). Anchor at line start so the source `url` line
+          # is hit but the bottle block's `root_url` (ends in "url") is not; the
+          # bottle block's `sha256 cellar: …` also stays untouched.
+          sed -i '' -E "s|^([[:space:]]*)url \"[^\"]*\"|\1url \"${url}\"|" "$dest"
+          sed -i '' -E "s|^([[:space:]]*)sha256 \"[a-f0-9]*\"|\1sha256 \"${sha}\"|" "$dest"
 
       - name: Build the bottle
         id: build
