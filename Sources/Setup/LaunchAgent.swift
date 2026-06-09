@@ -217,6 +217,21 @@ public struct LaunchAgentManager {
             : "unbreak: no watcher LaunchAgent was installed; nothing to do."
         return Outcome(message: message, exitCode: 0)
     }
+
+    /// launchd label of a Homebrew-managed watcher (`brew services start unbreak`,
+    /// the README's primary opt-in path). Brew writes its own versioned plist under
+    /// this label — distinct from our per-user `LaunchAgent.label` — so our own
+    /// uninstall never sees it. We detect it only to *report* it: stopping a
+    /// brew-managed service is brew's job (same reasoning as the binary, §9), so we
+    /// hand the user the exact command rather than booting it out behind brew's back.
+    public static let brewServiceLabel = "homebrew.mxcl.unbreak"
+
+    /// Whether a Homebrew-managed watcher is currently loaded in the user's GUI
+    /// domain. `launchctl list <label>` exits 0 when the label is loaded, non-zero
+    /// otherwise — enough to decide whether to surface the `brew services stop` hint.
+    public func brewServiceLoaded() -> Bool {
+        runLaunchctl(["list", LaunchAgentManager.brewServiceLabel]) == 0
+    }
 }
 
 extension LaunchAgentManager {
@@ -250,6 +265,12 @@ extension LaunchAgentManager {
                 let process = Process()
                 process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
                 process.arguments = arguments
+                // We consume only the exit status; launchctl's own chatter is never
+                // meant for the user (e.g. a defensive `bootout` of an unloaded agent
+                // prints "Boot-out failed: 3: No such process"). Discard both streams
+                // so the CLI's own messages are the only thing the user sees.
+                process.standardOutput = FileHandle.nullDevice
+                process.standardError = FileHandle.nullDevice
                 do {
                     try process.run()
                     process.waitUntilExit()

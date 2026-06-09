@@ -27,6 +27,22 @@ extension SetupCommand {
             failures.append(agent.message)
         }
 
+        // 1b. A watcher enabled via `brew services start unbreak` (the README's
+        //     primary opt-in) runs under brew's own label, which step 1 can't see —
+        //     so "nothing to do" above would be misleading while it's still running.
+        //     Detect it and hand back the brew command; stopping a brew-managed
+        //     service is brew's job, not ours (§9).
+        if environment.agentManager.brewServiceLoaded() {
+            environment.writeStdout(
+                """
+                A Homebrew-managed watcher is still running (\
+                \(LaunchAgentManager.brewServiceLabel)). Stop it with:
+                    brew services stop unbreak
+
+                """
+            )
+        }
+
         // 2. State files the daemon creates: ~/Library/Logs/unbreak*.log and the
         //    undo socket. Absent files are skipped, not reported as work.
         for url in environment.stateFiles where environment.fileExists(url) {
