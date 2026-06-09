@@ -14,6 +14,28 @@ a left-margin gutter into long lines. Copying a wrapped shell command carries ha
 breaks and leading spaces, so pasting garbles or prematurely runs it. This tool
 repairs exactly the copied fragment. (Background: PRD v2 §1.)
 
+## Quick start (teams)
+
+Have the **Xcode Command Line Tools** installed first (`xcode-select --install`) —
+the formula builds from source, so without them the install fails. Then:
+
+```sh
+brew install bart-turczynski/tap/unbreak   # puts the CLI on PATH
+unbreak setup                              # detect your terminals, write config, enable the watcher
+```
+
+`brew install` alone does **not** start the always-on behavior — it only installs
+the CLI. `unbreak setup` is the step that detects which terminals you use, writes
+the allowlist config, and offers to turn on the login watcher. If Homebrew warns
+about an untrusted tap, run `brew tap bart-turczynski/tap` first.
+
+Just want a one-shot repair without any background watcher? That works straight
+after `brew install`, no setup needed:
+
+```sh
+pbpaste | unbreak -                        # repair clipboard text, print to stdout
+```
+
 ## Install
 
 Primary path is a Homebrew tap (builds from source — needs the Xcode Command Line
