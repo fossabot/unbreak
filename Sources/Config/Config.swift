@@ -60,8 +60,10 @@ public struct CCFixConfig: Equatable, Sendable {
         # UNBREAK_MAX_CLIPBOARD_BYTES, UNBREAK_SHELL_SIGNAL_SCORE, UNBREAK_STRUCTURE_RISK)
         # take precedence over this file.
 
-        # Frontmost-app bundle ids watch mode will act in (gate 1, §7.1).
-        # terminals = ["com.apple.Terminal", "com.mitchellh.ghostty", "com.googlecode.iterm2"]
+        # Frontmost-app bundle ids watch mode will act in (gate 1, §7.1). Defaults to
+        # the popular macOS terminals (Apple Terminal, iTerm2, Ghostty, Kitty, Warp,
+        # Alacritty, WezTerm, Hyper, Tabby, cmux); set this to narrow or extend it.
+        # terminals = ["com.apple.Terminal", "net.kovidgoyal.kitty", "dev.warp.Warp-Stable"]
 
         # How often watch mode polls the clipboard, in milliseconds.
         # poll_interval_ms = 500

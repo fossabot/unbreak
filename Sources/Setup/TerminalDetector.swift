@@ -32,6 +32,13 @@ public enum TerminalDetector {
         "com.mitchellh.ghostty": "Ghostty",
         "com.googlecode.iterm2": "iTerm2",
         "com.apple.Terminal": "Apple Terminal",
+        "net.kovidgoyal.kitty": "Kitty",
+        "dev.warp.Warp-Stable": "Warp",
+        "dev.warp.Warp-Preview": "Warp Preview",
+        "org.alacritty": "Alacritty",
+        "com.github.wez.wezterm": "WezTerm",
+        "co.zeit.hyper": "Hyper",
+        "org.tabby": "Tabby",
     ]
 
     /// Decide which terminals to recommend for the allowlist.

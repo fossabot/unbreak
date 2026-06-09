@@ -175,7 +175,8 @@ extension SetupCommand {
             environment.writeStdout(
                 """
                 No known terminals detected. Seeding the allowlist with the shipped
-                defaults (cmux, Ghostty, iTerm2, Apple Terminal). Edit
+                defaults (Apple Terminal, iTerm2, Ghostty, Kitty, Warp, Warp Preview,
+                Alacritty, WezTerm, Hyper, Tabby, cmux). Edit
                 \(environment.configURL.path) to adjust.
 
                 """
