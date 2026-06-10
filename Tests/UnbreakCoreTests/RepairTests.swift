@@ -183,6 +183,75 @@ struct RepairTests {
         )
     }
 
+    // MARK: §6.2 Prose reflow opt-in (whitespace-guttered, no bar — Option A)
+
+    @Test("Off by default: a whitespace-guttered markdown block keeps the wrap break")
+    func proseReflowOffByDefault() {
+        // No `▎` bar, just a 2-space render gutter — the TUI hard-wrap case. With
+        // default options (the watcher's path) the wrapped item stays broken.
+        let input =
+            "  - first item that the renderer wrapped onto a second visual row,\n"
+            + "  continuing here\n"
+            + "  - second item"
+        let out = Repair.repair(input).text  // default: reflowParagraphs == false
+        #expect(
+            out == "- first item that the renderer wrapped onto a second visual row,\n"
+                + "continuing here\n"
+                + "- second item"
+        )
+    }
+
+    @Test("Opted in: the wrapped markdown item reflows; sibling bullets stay separate")
+    func proseReflowOptIn() {
+        let input =
+            "  - first item that the renderer wrapped onto a second visual row,\n"
+            + "  continuing here\n"
+            + "  - second item"
+        let out = Repair.repair(input, options: .init(reflowParagraphs: true)).text
+        #expect(
+            out == "- first item that the renderer wrapped onto a second visual row, "
+                + "continuing here\n"
+                + "- second item"
+        )
+    }
+
+    @Test("Opted in: a box-drawing table is never reflowed (subsumes the gate-6 guard)")
+    func proseReflowSkipsTable() {
+        // Uniform-width rows read as "full" to the word-fit test, but the seam guard
+        // keeps every row on its own line even with the opt-in active.
+        let input =
+            "┌──────────┬───────┐\n"
+            + "│ name     │ count │\n"
+            + "│ alpha    │ 12    │\n"
+            + "└──────────┴───────┘"
+        let out = Repair.repair(input, options: .init(reflowParagraphs: true)).text
+        #expect(out == input)
+    }
+
+    @Test("Opted in: a single wrapped bullet reflows (one marker is enough — CLAU-osmqojeq)")
+    func proseReflowSingleWrappedBullet() {
+        // The lone-bullet gap: §6.3 rejoin can't establish a column from one full
+        // line, and the strict veto's ≥2-marker rule never fired. The permissive
+        // trigger opts it in; the word-fit test merges the soft wrap.
+        let input =
+            "  - a single wrapped bullet item long enough to clear the forty-column reflow floor here\n"
+            + "  and then some more"
+        let out = Repair.repair(input, options: .init(reflowParagraphs: true)).text
+        #expect(
+            out == "- a single wrapped bullet item long enough to clear the "
+                + "forty-column reflow floor here and then some more"
+        )
+    }
+
+    @Test("Opted in: a short markered block stays put (width floor — no spurious merge)")
+    func proseReflowWidthFloor() {
+        // Max line width is below the wrap-column floor, so there is no evidence of
+        // real wrapping — the block's longest line must not be treated as "full".
+        let input = "- short one\nand two"
+        let out = Repair.repair(input, options: .init(reflowParagraphs: true)).text
+        #expect(out == input)
+    }
+
     @Test("List-marker detection: bullets and ordered markers vs flags")
     func listMarkerDetection() {
         #expect(Repair.startsWithListMarker("- item"))
