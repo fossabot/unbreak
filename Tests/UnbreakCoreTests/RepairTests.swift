@@ -59,6 +59,27 @@ struct RepairTests {
         #expect(out == "git push\n--force\norigin")
     }
 
+    @Test("Preserves structural code indentation when line 1 is the outermost scope (§6.8)")
+    func dedentPreservesStructuralCode() {
+        // Line 1 (`def`) is the real left edge at column 0; the body's ≥3 distinct
+        // indent levels (4, 8, 12) are genuine nesting, not a render gutter. De-gutter
+        // must not mistake the 4-space body indent for a gutter and flatten structure.
+        let input = "def f():\n    for x in y:\n        if x:\n            go(x)\n    return"
+        let (out, changed) = Repair.degutter(input, tabWidth: 8)
+        #expect(!changed)
+        #expect(out == input)
+    }
+
+    @Test("A real gutter on every line (incl. line 1) over nested code still strips")
+    func dedentStripsGutterOverNestedCode() {
+        // A +2 render gutter prefixes line 1 too, so the indent common to all lines is
+        // 2; stripping it removes the gutter while keeping the body's nesting intact.
+        let input = "  def f():\n  a = 1\n      deep = 2"
+        let (out, changed) = Repair.degutter(input, tabWidth: 8)
+        #expect(changed)
+        #expect(out == "def f():\na = 1\n    deep = 2")
+    }
+
     // MARK: §6.2 Quote-bar gutter (Claude Code queued-prompt box)
 
     @Test("Strips the `  ▎ ` quote-bar gutter from every line")

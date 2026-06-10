@@ -34,6 +34,7 @@ struct KnownIssueTests {
         "F2-twoline-wrap",  // CLAU-umzcppan: two-line wraps rejoin (tolerance-based detection)
         "F3-uneven-multiline-wrap",  // CLAU-rtzoinwb: uneven-width wraps rejoin (±2 band)
         "F4-url-token-corruption",  // CLAU-ajqigmcx: mid-token rejoin no longer injects spaces
+        "F6-degutter-flatten",  // CLAU-vqcljzus: de-gutter preserves structural code indentation
     ]
 
     /// Still-open gaps — asserted inside `withKnownIssue` so CI stays green until the

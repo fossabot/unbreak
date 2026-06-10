@@ -172,14 +172,36 @@ public enum Repair {
         let lines = splitLines(text)
         guard lines.count >= 2 else { return (text, false) }
 
-        // Gutter `G` = minimum leading width over non-blank lines 2..n, excluding
-        // heredoc bodies (§6.4) — their intentional indentation must not skew `G`.
-        let indents =
+        // Body indents = leading widths of non-blank lines 2..n, excluding heredoc
+        // bodies (§6.4) — their intentional indentation must not skew the gutter.
+        let bodyIndents =
             lines.enumerated()
             .dropFirst()
             .filter { !protected.contains($0.offset) && !isBlank($0.element) }
             .map { DisplayWidth.leadingWidth(of: $0.element, tabWidth: tabWidth) }
-        guard let g = indents.min(), g > 0 else { return (text, false) }
+        guard let gBody = bodyIndents.min() else { return (text, false) }
+
+        // When line 1 sits *below* the body's minimum indent the gutter is ambiguous:
+        // either line 1 was partially selected and clipped below a real render gutter
+        // (§5 Case 3 — strip the body minimum), or line 1 is the outermost scope of
+        // indented source and the body indent is genuine structure (strip nothing
+        // beyond line 1's own indent). Excluding line 1 unconditionally (the old
+        // behavior) always assumed the former and so flattened code like `def f():`
+        // over its body, violating §6.8 lossless-on-clean.
+        //
+        // Disambiguate by nesting depth: a clipped command or its continuations sit at
+        // one or two indent levels, whereas source code with ≥3 distinct body indents
+        // is unmistakably structural — keep it. (A real gutter that *does* prefix
+        // line 1 lands in the `indent1 >= gBody` path below and still strips cleanly.)
+        let line1Active = !protected.contains(0) && !isBlank(lines[0])
+        let indent1 =
+            line1Active ? DisplayWidth.leadingWidth(of: lines[0], tabWidth: tabWidth) : gBody
+        let distinctBodyLevels = Set(bodyIndents).count
+        let structuralCode = line1Active && indent1 < gBody && distinctBodyLevels >= 3
+        // Structural code: the gutter is only line 1's own indent (often 0), so its
+        // nesting survives. Otherwise the body minimum is the render gutter.
+        let g = structuralCode ? indent1 : gBody
+        guard g > 0 else { return (text, false) }
 
         var out: [String] = []
         out.reserveCapacity(lines.count)
@@ -280,7 +302,16 @@ public enum Repair {
                 // without this they would wrongly collapse into one line. This binds
                 // even under joinAll: merging bullets is never what was meant.
                 let nextIsListItem = startsWithListMarker(lines[i + 1])
-                let isWrap = isFull && !endsContinuation && nextNonBlank
+                // A soft-wrap continuation returns to the block's left margin (column
+                // 0 once de-gutter has run), so a next line that is itself *indented*
+                // is intentional structure — nested code, not a wrap. Without this,
+                // consecutive code lines that happen to share a near-`w` width (e.g. a
+                // `for:`/`if:`/body run) get spuriously merged, mangling clean source
+                // (§6.8). The de-gutter pass has already removed any real gutter, so
+                // surviving indentation is always meaningful here.
+                let nextIndented =
+                    DisplayWidth.leadingWidth(of: lines[i + 1], tabWidth: profile.tabWidth) > 0
+                let isWrap = isFull && !endsContinuation && nextNonBlank && !nextIndented
                 if !nextIsListItem && (options.joinAll || isWrap) {
                     // Mid-token char-wrap (§5 Case 4): when the left line is a
                     // confirmed token fragment, the seam fell inside one unbreakable
