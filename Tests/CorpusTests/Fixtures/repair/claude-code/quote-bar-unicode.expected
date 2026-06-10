@@ -1,0 +1,2 @@
+这是一个宽字符测试 mixing 日本語のテキスト with an emoji family 👨‍👩‍👧‍👦 and flags 🇯🇵🇺🇸, plus a combining café and 
+a variation selector ❤️, all on one line long enough that the width-aware reflow must handle wide cells and ZWJ clusters without corruption.

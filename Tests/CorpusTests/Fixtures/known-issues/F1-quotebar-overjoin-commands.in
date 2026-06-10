@@ -1,0 +1,2 @@
+  ▎ git tag v9 && git push origin v9 && gh release new
+  ▎ make sign && make notarize && make upload && upload

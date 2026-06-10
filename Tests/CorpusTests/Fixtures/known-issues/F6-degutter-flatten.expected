@@ -1,0 +1,5 @@
+def repair(text):
+    for line in text.splitlines():
+        if line.strip():
+            yield dedent(line)
+    return None

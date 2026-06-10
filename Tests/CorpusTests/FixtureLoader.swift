@@ -49,10 +49,23 @@ enum FixtureLoader {
     }
 
     static func goldenPairs(tool: String) -> [GoldenPair] {
-        let dir =
-            root
-            .appendingPathComponent("repair", isDirectory: true)
-            .appendingPathComponent(tool, isDirectory: true)
+        pairs(
+            in: root
+                .appendingPathComponent("repair", isDirectory: true)
+                .appendingPathComponent(tool, isDirectory: true)
+        )
+    }
+
+    /// Known-gap pairs under `Fixtures/known-issues/`: a real capture (`<case>.in`)
+    /// and the form repair *should* produce once the linked CLAU issue is fixed
+    /// (`<case>.expected`). Asserted inside `withKnownIssue` so CI stays green today
+    /// and fails loudly the moment a gap is fixed (prompting the wrapper's removal).
+    static func knownIssues() -> [GoldenPair] {
+        pairs(in: root.appendingPathComponent("known-issues", isDirectory: true))
+    }
+
+    /// Load every `<case>.in` / `<case>.expected` pair directly under `dir`.
+    private static func pairs(in dir: URL) -> [GoldenPair] {
         let urls =
             (try? FileManager.default.contentsOfDirectory(
                 at: dir,

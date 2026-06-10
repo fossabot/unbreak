@@ -1,0 +1,1 @@
+git log --oneline --no-merges --since="2 weeks ago" --author="Bart" | grep -iE 'fix|repair' | awk '{print $1}' | xargs -I{} git show --stat {} && echo "done scanning the recent repair commits" 
