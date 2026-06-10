@@ -17,15 +17,15 @@ class Unbreak < Formula
   homepage "https://github.com/bart-turczynski/unbreak"
   # Source tarball for the tagged release. `version` is explicit so users update
   # only on a bump, not on every tap refresh.
-  url "https://github.com/bart-turczynski/unbreak/archive/refs/tags/v0.1.3.tar.gz"
-  version "0.1.3"
-  # Digest of the v0.1.3 source tarball (see docs/RELEASING.md):
-  #   curl -fsSL .../v0.1.3.tar.gz | shasum -a 256
+  url "https://github.com/bart-turczynski/unbreak/archive/refs/tags/v0.2.0.tar.gz"
+  version "0.2.0"
+  # Digest of the v0.2.0 source tarball (see docs/RELEASING.md):
+  #   curl -fsSL .../v0.2.0.tar.gz | shasum -a 256
   # NOTE: in *this* repo the formula ships inside the tarball it points at, so a
   # self-consistent source sha is impossible — the tap repo's copy carries the
   # real digest, and release.yml injects it for the bottle build. This value is a
   # placeholder until mirrored to the tap.
-  sha256 "804ea9784686e86cac068bea8b51e2193311c2a3f91bd972ae93a13156374782"
+  sha256 "8de50b5ecd34dab0434fc2c0a4dd9770a4f2e51d08409e873683c414f831aa51"
   license "MIT"
 
   # Prebuilt binary, hosted as a GitHub release asset (see .github/workflows/
@@ -36,8 +36,8 @@ class Unbreak < Formula
   # the binary hardcodes no Cellar path (links only system libs + the OS Swift
   # runtime).
   bottle do
-    root_url "https://github.com/bart-turczynski/unbreak/releases/download/v0.1.3"
-    sha256 cellar: :any_skip_relocation, arm64_ventura: "4230d224088571869904038a8e617576969fffab9fab7e3f48b318d1e9eef143"
+    root_url "https://github.com/bart-turczynski/unbreak/releases/download/v0.2.0"
+    sha256 cellar: :any_skip_relocation, arm64_ventura: "a35bef71d271ae76ca22efefd99b272aba714c144ec0f2f6896e9df582735e3d"
   end
 
   depends_on :macos
