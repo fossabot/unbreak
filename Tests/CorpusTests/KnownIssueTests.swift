@@ -31,6 +31,7 @@ struct KnownIssueTests {
     /// from the open set the moment its fix lands. The fixture pair stays put under
     /// `Fixtures/known-issues/` so `corpusWired` keeps covering the whole corpus.
     static let fixed: Set<String> = [
+        "F1-quotebar-overjoin-commands",  // CLAU-jelhxutz: reflow keeps shell-chain commands apart
         "F2-twoline-wrap",  // CLAU-umzcppan: two-line wraps rejoin (tolerance-based detection)
         "F3-uneven-multiline-wrap",  // CLAU-rtzoinwb: uneven-width wraps rejoin (±2 band)
         "F4-url-token-corruption",  // CLAU-ajqigmcx: mid-token rejoin no longer injects spaces

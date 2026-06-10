@@ -205,6 +205,21 @@ struct RepairTests {
         #expect(out == "docker run --rm --volume \"$PWD\":/work --workdir /work img")
     }
 
+    @Test("Reflow keeps separate shell-chain commands on their own lines (F1)")
+    func reflowKeepsShellCommandsApart() {
+        // Two near-equal-width `&&` chains are distinct commands, not one wrapped
+        // paragraph: the widest-line word-fit test would always merge them, so the
+        // shell-chain guard keeps the intentional break (only the bar is stripped).
+        let input =
+            "  ▎ git tag v9 && git push origin v9 && gh release new\n"
+            + "  ▎ make sign && make notarize && make upload && upload"
+        let out = Repair.repair(input).text
+        #expect(
+            out == "git tag v9 && git push origin v9 && gh release new\n"
+                + "make sign && make notarize && make upload && upload"
+        )
+    }
+
     // MARK: §6.3 Rejoin
 
     @Test("Rejoins a word-boundary wrap with a single space (§5 case 1)")

@@ -101,6 +101,14 @@ extension Repair {
                 // wrap. The marker requires a trailing space, so a `--flag` or `-x`
                 // continuation is *not* mistaken for a bullet.
                 if startsWithListMarker(lines[i + 1]) { break }
+                // A shell-chain operator (`&&`, `||`, ` | `) marks a line as a
+                // self-contained command, not soft-wrapped prose. The widest line in
+                // the block has no slack, so the word-fit test below *always* reads it
+                // as a wrap — which smushes two distinct commands of near-equal width
+                // onto one line (F1). Their newline is intentional, so keep the break.
+                // (This guard lives only here: §6.3 `rejoin` must still rejoin a single
+                // piped command that wrapped across lines — F2.)
+                if isShellChain(lines[i]) || isShellChain(lines[i + 1]) { break }
                 // The renderer wrapped here iff the next word overflowed line `i`.
                 let wouldOverflow = widths[i] + 1 + firstWordWidth(lines[i + 1]) > w
                 if wouldOverflow {
@@ -114,6 +122,13 @@ extension Repair {
             i += 1
         }
         return out.joined(separator: "\n")
+    }
+
+    /// True if the line carries a shell-chain operator — ` && `, ` || `, or ` | ` —
+    /// the mark of a self-contained command rather than soft-wrapped prose. Spaces
+    /// around the token keep it from matching `&&` glued inside an argument/string.
+    static func isShellChain(_ line: String) -> Bool {
+        line.contains(" && ") || line.contains(" || ") || line.contains(" | ")
     }
 
     /// Does `line` open with a list-item marker — a bullet (`-`, `*`, `+`, `•`) or
