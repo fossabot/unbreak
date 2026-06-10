@@ -1,1 +1,1 @@
-git commit -m "release: cut the $(date +%Y-%m-%d) build from $(git rev-parse --short HEAD) and copy the signed artifact into \"/Volumes/Build Output/ccfix releases/latest\" before notarizing it with the production credentials" 
+git commit -m "release: cut the $(date +%Y-%m-%d) build from $(git rev-parse --short HEAD) and copy the signed artifact into \"/Volumes/Build Output/ccfix releases/latest\" before notarizing it with the production credentials"

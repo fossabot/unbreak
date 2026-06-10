@@ -319,6 +319,30 @@ struct RepairTests {
         #expect(Repair.detectWidth([30, 70, 70, 30]) == 70)
     }
 
+    @Test("Wrap-width detection clusters near-equal widths within ±2 (F3)")
+    func detectWidthTolerance() {
+        // Uneven word-wraps rarely land on the exact same cell, so widths within the
+        // same ±2 band as `isFull` form one cluster; W is the top of the band.
+        #expect(Repair.detectWidth([94, 95, 35]) == 95)
+        #expect(Repair.detectWidth([95, 94, 93, 40]) == 95)
+        // A trailing blank line (from a final newline) is ignored, not counted as the
+        // remainder.
+        #expect(Repair.detectWidth([94, 95, 35, 0]) == 95)
+    }
+
+    @Test("Wrap-width detection accepts a single full line only on a 2-line wrap (F2)")
+    func detectWidthTwoLine() {
+        // One full line wide enough to be a column + a strictly shorter remainder.
+        #expect(Repair.detectWidth([139, 52]) == 139)
+        #expect(Repair.detectWidth([139, 52, 0]) == 139)
+        // Too narrow to trust a lone candidate, or the "remainder" is not shorter →
+        // not a wrap (the latter guards a quote-bar reflow's intentional break).
+        #expect(Repair.detectWidth([30, 12]) == nil)
+        #expect(Repair.detectWidth([118, 140]) == nil)
+        // Three lines with no repeated/clustered width stay ambiguous → nil.
+        #expect(Repair.detectWidth([139, 60, 52]) == nil)
+    }
+
     @Test("A count tie does not make repair flaky across runs (§6.8)")
     func tiedWidthsAreIdempotent() {
         // Mirrors the seed-436 fuzz case: two long unbreakable URL-like lines tie

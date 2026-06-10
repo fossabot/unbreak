@@ -308,27 +308,69 @@ public enum Repair {
         )
     }
 
-    /// Wrap column = the most common repeated display width among non-final lines
-    /// wide enough to plausibly be a wrap point. Returns nil when no such column
-    /// dominates, which keeps clean input unchanged (§6.8).
+    /// Plausible-wrap-point floor: a line narrower than this is never treated as a
+    /// wrap column. Keeps short clean lines (`one\ntwo\nthree`) from ever joining.
+    static let minWrapColumn = 20
+    /// A *single* full line is weak evidence of a wrap, so a lone candidate only
+    /// establishes a column on a clean two-line paste and only when it is at least
+    /// this wide — comfortably below a narrow split-pane width, well above any line a
+    /// user would deliberately type and break by hand.
+    static let minTwoLineWrapColumn = 40
+
+    /// Wrap column = the dominant display width among the **full, non-final** lines,
+    /// matched with the same ±2 tolerance `rejoin` uses for "full". Returns nil when
+    /// no column dominates, which keeps clean input unchanged (§6.8).
     ///
-    /// The tie-break is deterministic and **must stay that way**: `Dictionary`
-    /// iteration order is randomized per process by Swift's hash seed, so a bare
-    /// `max(by: value)` would pick a different width across runs whenever two widths
-    /// share the top count — making `repair` non-idempotent at random (§6.8). On a
-    /// count tie we pick the **larger** width: it admits fewer lines as "full", so
+    /// Real word-wraps vary by a few columns (the last word that fit rarely lands on
+    /// the exact same cell), so an *exactly* repeated width is too strict — it misses
+    /// uneven multi-line wraps (F3) and two-line wraps that have only one non-final
+    /// line (F2). We instead cluster candidates into a [w-2, w] band (mirroring
+    /// `isFull`) and take the band with the most members; a lone candidate is
+    /// accepted only for a clean two-line paste that is suitably wide.
+    ///
+    /// The tie-break is deterministic and **must stay that way**: a bare `max(by:)`
+    /// over a `Dictionary` would pick a different width across runs whenever two
+    /// share the top count (Swift randomizes hash-seed iteration order), making
+    /// `repair` non-idempotent at random (§6.8). We iterate sorted widths and break
+    /// count ties toward the **larger** column: it admits fewer lines as "full", so
     /// fewer speculative rejoins fire ("when in doubt, don't act", §7).
     static func detectWidth(_ widths: [Int]) -> Int? {
-        let candidates = widths.dropLast().filter { $0 >= 20 }
-        guard candidates.count >= 2 else { return nil }
-        var counts: [Int: Int] = [:]
-        for value in candidates { counts[value, default: 0] += 1 }
-        // Order by count, then by width as a stable tie-break (largest wins).
-        let best = counts.max { lhs, rhs in
-            lhs.value != rhs.value ? lhs.value < rhs.value : lhs.key < rhs.key
+        // Drop the trailing blank line a final newline leaves behind, so the real
+        // remainder line — not the empty string — is the one excluded as non-final.
+        var content = widths
+        while let last = content.last, last == 0 { content.removeLast() }
+        guard content.count >= 2 else { return nil }
+
+        // Exclude the final content line: it is the wrap remainder, narrower than the
+        // column, so counting it would only dilute the band.
+        let candidates = content.dropLast().filter { $0 >= minWrapColumn }
+        guard !candidates.isEmpty else { return nil }
+
+        // For each distinct candidate width `w`, count how many candidates fall in its
+        // [w-2, w] band; pick the widest `w` with the largest band.
+        var bestWidth = 0
+        var bestCount = 0
+        for w in Set(candidates).sorted() {
+            let count = candidates.filter { $0 >= w - 2 && $0 <= w }.count
+            if count > bestCount || (count == bestCount && w > bestWidth) {
+                bestCount = count
+                bestWidth = w
+            }
         }
-        guard let best, best.value >= 2 else { return nil }
-        return best.key
+
+        if bestCount >= 2 { return bestWidth }
+        // A single full line is only trusted as a wrap column on a two-line paste:
+        // one full line wide enough to be a column, plus a strictly shorter
+        // remainder. The remainder check matters — a confirmed quote-bar reflow
+        // (§6.2) can leave two lines where the *second* is the longer one (an
+        // intentional break it preserved); that is not a wrap and must not rejoin.
+        // More lines without a repeated width are too ambiguous to act on.
+        if content.count == 2, bestWidth >= minTwoLineWrapColumn,
+            let remainder = content.last, remainder < bestWidth
+        {
+            return bestWidth
+        }
+        return nil
     }
 
     // MARK: - Helpers
