@@ -230,6 +230,30 @@ public enum Repair {
         }
         let w = detected ?? Int.max
 
+        // §5 Case 4: a terminal only breaks *inside* a token when that token is
+        // longer than the wrap column — there is no space to break at, so the
+        // fragments must rejoin with **no** space (the old tool's injected-space bug
+        // corrupted URLs/hashes/base64). A "solid" line is one that is full *and* a
+        // single space-free token, i.e. a fragment of such a wrap.
+        //
+        // A lone solid line followed by a short line is genuinely ambiguous — it is
+        // indistinguishable from a long word that fit exactly and then an ordinary
+        // word wrap (the §5 case 1 test locks that as a single-space join). So a
+        // fragment is only confirmed by a *neighbour*: a run of ≥2 consecutive solid
+        // lines is unmistakably one token char-wrapped across lines. A line is a
+        // `fragment` when it is solid and has a solid neighbour; every seam whose left
+        // line is a fragment (including the seam onto a short final remainder) joins
+        // without a space. `joinAll` (sentinel `w == .max`) can't know the column, so
+        // it always falls back to the safe word join.
+        let solid = lines.indices.map { idx in
+            w != .max && widths[idx] >= w - 2 && widths[idx] <= w
+                && !lines[idx].contains(where: { $0 == " " || $0 == "\t" })
+        }
+        func isFragment(_ idx: Int) -> Bool {
+            guard solid[idx] else { return false }
+            return (idx > 0 && solid[idx - 1]) || (idx + 1 < solid.count && solid[idx + 1])
+        }
+
         var out: [String] = []
         var joins = 0
         var i = 0
@@ -258,7 +282,14 @@ public enum Repair {
                 let nextIsListItem = startsWithListMarker(lines[i + 1])
                 let isWrap = isFull && !endsContinuation && nextNonBlank
                 if !nextIsListItem && (options.joinAll || isWrap) {
-                    current = joinSeam(current, lines[i + 1])
+                    // Mid-token char-wrap (§5 Case 4): when the left line is a
+                    // confirmed token fragment, the seam fell inside one unbreakable
+                    // token, so rejoin with no space. Otherwise it is a word boundary
+                    // and rejoins with a single space.
+                    current =
+                        isFragment(i)
+                        ? joinSeamTight(current, lines[i + 1])
+                        : joinSeam(current, lines[i + 1])
                     joins += 1
                     i += 1
                 } else {
@@ -318,6 +349,18 @@ public enum Repair {
         var r = Substring(right)
         while r.hasPrefix(" ") { r = r.dropFirst() }
         return String(l) + " " + String(r)
+    }
+
+    /// Join a mid-token wrap with **no** space — the terminal split a single
+    /// unbreakable token (URL/hash/base64) across the column, so the two halves
+    /// belong directly adjacent. Trailing/leading spaces at the seam are still
+    /// trimmed for safety, though a true mid-token break never has any.
+    static func joinSeamTight(_ left: String, _ right: String) -> String {
+        var l = Substring(left)
+        while l.hasSuffix(" ") { l = l.dropLast() }
+        var r = Substring(right)
+        while r.hasPrefix(" ") { r = r.dropFirst() }
+        return String(l) + String(r)
     }
 
     /// Remove up to `columns` of leading whitespace (display-width aware).

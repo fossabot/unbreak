@@ -26,20 +26,45 @@ struct KnownIssueTests {
         "F6-degutter-flatten": "CLAU-vqcljzus",  // de-gutter flattens code indentation
     ]
 
+    /// Fixtures whose gap has been **fixed**: they assert with a plain `#expect`
+    /// (a permanent regression lock) instead of `withKnownIssue`. A case moves here
+    /// from the open set the moment its fix lands. The fixture pair stays put under
+    /// `Fixtures/known-issues/` so `corpusWired` keeps covering the whole corpus.
+    static let fixed: Set<String> = [
+        "F4-url-token-corruption"  // CLAU-ajqigmcx: mid-token rejoin no longer injects spaces
+    ]
+
+    /// Still-open gaps — asserted inside `withKnownIssue` so CI stays green until the
+    /// fix lands, then fails ("known issue was not recorded") to prompt promotion.
+    static var open: [String: String] {
+        trackingIssue.filter { !fixed.contains($0.key) }
+    }
+
     @Test("Every known gap has a tracking issue and a fixture pair")
     func corpusWired() {
         let names = Set(FixtureLoader.knownIssues().map(\.caseName))
-        #expect(names == Set(Self.trackingIssue.keys), "known-issue corpus drifted from the issue map")
+        #expect(
+            names == Set(Self.trackingIssue.keys),
+            "known-issue corpus drifted from the issue map"
+        )
     }
 
     @Test(
-        "Each known gap repairs to its desired form once fixed",
-        arguments: FixtureLoader.knownIssues()
+        "Each open gap repairs to its desired form once fixed",
+        arguments: FixtureLoader.knownIssues().filter { Self.open.keys.contains($0.caseName) }
     )
     func knownGap(_ pair: FixtureLoader.GoldenPair) {
         let issue = Self.trackingIssue[pair.caseName] ?? "UNTRACKED"
         withKnownIssue("\(issue): repair gap (\(pair.caseName)) — promote to #expect when fixed") {
             #expect(Repair.repair(pair.input).text == pair.expected)
         }
+    }
+
+    @Test(
+        "Each fixed gap stays repaired (regression lock)",
+        arguments: FixtureLoader.knownIssues().filter { Self.fixed.contains($0.caseName) }
+    )
+    func fixedGap(_ pair: FixtureLoader.GoldenPair) {
+        #expect(Repair.repair(pair.input).text == pair.expected)
     }
 }

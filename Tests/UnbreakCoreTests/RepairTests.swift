@@ -226,6 +226,35 @@ struct RepairTests {
         #expect(Repair.repair(url).text == url)
     }
 
+    @Test("Case 4: a token char-wrapped across full lines rejoins with no space")
+    func case4MidTokenRejoin() {
+        // Three space-free fragments at the wrap column: a run of ≥2 full solid
+        // lines marks them as one token, so the seams (including onto the short
+        // final remainder) join with no space — never injecting a corrupting space.
+        let head = String(repeating: "a", count: 42)
+        let mid = String(repeating: "b", count: 42)
+        let result = Repair.rejoin(
+            "\(head)\n\(mid)\nccc",
+            profile: .claudeCode,
+            options: .init(forcedWidth: 42)
+        )
+        #expect(result.text == head + mid + "ccc")
+    }
+
+    @Test("Case 4: a lone full token line + short line stays a single-space word join")
+    func case4TwoLineAmbiguityKeepsSpace() {
+        // One full solid line then a short line is indistinguishable from a long word
+        // that fit exactly, then an ordinary word wrap — so the conservative join
+        // (a single space, §5 case 1) wins rather than risk gluing two words.
+        let head = String(repeating: "a", count: 42)
+        let result = Repair.rejoin(
+            head + "\nshort",
+            profile: .claudeCode,
+            options: .init(forcedWidth: 42)
+        )
+        #expect(result.text == head + " short")
+    }
+
     @Test("Case 6: a `\\` continuation layout is never rejoined into one line")
     func case6BackslashLayoutRoundTrip() {
         // De-gutter may strip a uniform leading indent (indistinguishable from the

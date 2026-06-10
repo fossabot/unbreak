@@ -50,7 +50,8 @@ enum FixtureLoader {
 
     static func goldenPairs(tool: String) -> [GoldenPair] {
         pairs(
-            in: root
+            in:
+                root
                 .appendingPathComponent("repair", isDirectory: true)
                 .appendingPathComponent(tool, isDirectory: true)
         )
