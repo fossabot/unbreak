@@ -276,7 +276,16 @@ struct RepairTests {
         #expect(result.text == head + " short")
     }
 
-    @Test("Case 6: a `\\` continuation layout is never rejoined into one line")
+    @Test("Box-drawing table rows are never rejoined into one line (F5)")
+    func boxDrawingTableNotSmushed() {
+        // Uniform-width rows read as "full", but box-drawing newlines are structural.
+        let table =
+            "┌──────────┬──────────┐\n"
+            + "│ alpha    │ bravo    │\n"
+            + "│ charlie  │ delta    │\n"
+            + "└──────────┴──────────┘"
+        #expect(Repair.repair(table).text == table)
+    }
     func case6BackslashLayoutRoundTrip() {
         // De-gutter may strip a uniform leading indent (indistinguishable from the
         // render gutter), but the `\`-terminated newlines must survive — the lines

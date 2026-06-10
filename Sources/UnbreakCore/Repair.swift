@@ -311,8 +311,14 @@ public enum Repair {
                 // surviving indentation is always meaningful here.
                 let nextIndented =
                     DisplayWidth.leadingWidth(of: lines[i + 1], tabWidth: profile.tabWidth) > 0
+                // Box-drawing rows (tables, trees) line up at a uniform width and so
+                // read as "full", but their newlines are structural, never wraps —
+                // merging them smushes the whole table onto one line. Guard either
+                // side of the seam, and bind even under joinAll (like list markers).
+                let touchesBoxDrawing =
+                    containsBoxDrawing(lines[i]) || containsBoxDrawing(lines[i + 1])
                 let isWrap = isFull && !endsContinuation && nextNonBlank && !nextIndented
-                if !nextIsListItem && (options.joinAll || isWrap) {
+                if !nextIsListItem && !touchesBoxDrawing && (options.joinAll || isWrap) {
                     // Mid-token char-wrap (§5 Case 4): when the left line is a
                     // confirmed token fragment, the seam fell inside one unbreakable
                     // token, so rejoin with no space. Otherwise it is a word boundary
@@ -412,6 +418,13 @@ public enum Repair {
 
     static func isBlank(_ line: String) -> Bool {
         line.allSatisfy { $0 == " " || $0 == "\t" }
+    }
+
+    /// True if the line carries a Unicode Box Drawing glyph (U+2500–U+257F) — the
+    /// `─│┌┬┐├┼┤└┴┘` family used by table and tree output. Such lines are structural
+    /// and must never be rejoined (§6.3 guard, F5).
+    static func containsBoxDrawing(_ line: String) -> Bool {
+        line.unicodeScalars.contains { (0x2500...0x257F).contains($0.value) }
     }
 
     /// Join a word-boundary wrap with exactly one space, collapsing the accidental
