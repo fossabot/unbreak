@@ -321,6 +321,44 @@ public enum Repair {
             return (idx > 0 && solid[idx - 1]) || (idx + 1 < solid.count && solid[idx + 1])
         }
 
+        // The `solid` test above only spots a mid-token wrap when the *whole* line is
+        // one space-free token — it misses a long unbreakable token at the tail of an
+        // otherwise spaced line (`gcloud … --scopes=openid,https://www.g` wrapping into
+        // `oogleapis.com/auth/cse`), where injecting a word-join space splits the URL
+        // into an invalid `https://www.g` scope. Decide tight-vs-space at the *seam*
+        // instead: a terminal/TUI only hard-breaks *inside* a token when that token is
+        // too long for one line, so the seam fell mid-token exactly when (a) no
+        // whitespace sits on either side of it and (b) the token straddling it —
+        // `lines[idx]`'s trailing run plus `lines[idx+1]`'s leading run — is wider than
+        // the wrap column `w`, i.e. it could never have fit on one line. A short
+        // boundary token (`--workdir` + `/work`) is an ordinary word wrap. joinAll
+        // (sentinel `w == .max`) can't know the column, so it keeps the safe word join.
+        func seamIsMidToken(_ idx: Int) -> Bool {
+            guard w != .max, idx + 1 < lines.count else { return false }
+            let left = lines[idx], right = lines[idx + 1]
+            // Only a line with *interior* whitespace gets the seam test: there the
+            // trailing run is genuinely a tail token (`… --scopes=…g`), so a boundary
+            // wider than `w` is firm evidence of a char-break. A lone full token line
+            // that fills the column on its own (no interior space) is the ambiguous §5
+            // case-1 shape — a word that fit exactly is indistinguishable from a
+            // char-break — and stays a single-space join unless a *solid run* (≥2 such
+            // lines, `isFragment`) confirms the wrap. Without this guard the case-1
+            // lock (`xx…(42 cols)` + `/tmp/out.json`) would flip to a tight join.
+            guard left.contains(" ") || left.contains("\t") else { return false }
+            guard let l = left.last, l != " ", l != "\t" else { return false }
+            guard let r = right.first, r != " ", r != "\t" else { return false }
+            let leftRun = String(left.reversed().prefix { $0 != " " && $0 != "\t" }.reversed())
+            let rightRun = String(right.prefix { $0 != " " && $0 != "\t" })
+            let boundaryWidth =
+                DisplayWidth.width(of: leftRun, tabWidth: profile.tabWidth)
+                + DisplayWidth.width(of: rightRun, tabWidth: profile.tabWidth)
+            return boundaryWidth > w
+        }
+
+        // A seam joins tight when either signal fires: a confirmed solid-run fragment,
+        // or a boundary token too wide to have fit on one line.
+        func midTokenSeam(_ idx: Int) -> Bool { isFragment(idx) || seamIsMidToken(idx) }
+
         var out: [String] = []
         var joins = 0
         var i = 0
@@ -368,16 +406,32 @@ public enum Repair {
                 // markers / box-drawing): swallowing a command into a comment is never
                 // what the user meant.
                 let leftEndsWithComment = endsWithComment(lines[i])
+                // A soft-wrap continuation resumes the previous statement mid-stream
+                // (arguments, paths, words), so it never *begins a fresh command*. When
+                // the next line opens with a known tool or a `VAR=value` assignment it is
+                // a separate statement, not a wrap remainder — two independent commands
+                // that happen to share a near-`w` display width (`cd ~/p` / `python3 -m
+                // venv .venv`, both 30 cols) read as "full" and would otherwise smush
+                // into one unrunnable line. Bind even under joinAll, like the list /
+                // box-drawing / comment guards: gluing two commands together is never
+                // what the user meant. Skip the guard on a confirmed mid-token char-wrap
+                // (`isFragment`): there the next line is the tail of one unbreakable
+                // token, not a statement, and a solid-run fragment like `n=eyJ…` (the
+                // back half of `…?token=…`) only *looks* like a `VAR=value` start (F4).
+                // This keys off `isFragment` (the whole-line solid-run test), not the
+                // broader seam test: a wide boundary token alone (e.g. a long path next
+                // to a fresh command, `~/p` + `python3`) is not evidence of a wrap.
+                let nextStartsCommand = !isFragment(i) && startsFreshCommand(lines[i + 1])
                 let isWrap = isFull && !endsContinuation && nextNonBlank && !nextIndented
                 if !nextIsListItem && !touchesBoxDrawing && !leftEndsWithComment
+                    && !nextStartsCommand
                     && (options.joinAll || isWrap)
                 {
-                    // Mid-token char-wrap (§5 Case 4): when the left line is a
-                    // confirmed token fragment, the seam fell inside one unbreakable
-                    // token, so rejoin with no space. Otherwise it is a word boundary
-                    // and rejoins with a single space.
+                    // Mid-token char-wrap (§5 Case 4): when the seam fell inside one
+                    // unbreakable token, rejoin with no space. Otherwise it is a word
+                    // boundary and rejoins with a single space.
                     current =
-                        isFragment(i)
+                        midTokenSeam(i)
                         ? joinSeamTight(current, lines[i + 1])
                         : joinSeam(current, lines[i + 1])
                     joins += 1
@@ -545,6 +599,22 @@ public enum Repair {
             }
         }
         return false
+    }
+
+    /// True when `line` begins a *fresh* shell statement — its first bare token is a
+    /// known command/tool (`Signals.knownTools`) or it opens with a `VAR=value`
+    /// assignment. A soft-wrap continuation never starts this way: the wrap broke
+    /// mid-statement, so the remainder resumes with arguments/words, not a new command
+    /// invocation. §6.3 rejoin refuses to treat a seam *onto* such a line as a wrap, so
+    /// two independent commands that coincidentally share a near-`w` display width
+    /// (`cd ~/p` / `python3 -m venv .venv`) stay on separate lines instead of smushing
+    /// into one unrunnable line. Conservative by construction — the known-tool and
+    /// assignment shapes are unambiguous statement starts, never wrap remainders (a
+    /// real wrap continues with the argument *to* the trailing flag, e.g. `--workdir`
+    /// then `/work …`, which is not a known tool), so the guard only ever *forgoes* a
+    /// rejoin (leaves two lines); it can never corrupt.
+    static func startsFreshCommand(_ line: String) -> Bool {
+        Signals.startsWithKnownTool(line) || Signals.hasEnvAssignmentPrefix(line)
     }
 
     /// Remove up to `columns` of leading whitespace (display-width aware).

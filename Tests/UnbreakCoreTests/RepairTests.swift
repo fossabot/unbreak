@@ -332,6 +332,39 @@ struct RepairTests {
         #expect(!Repair.repair(input).report.changed)
     }
 
+    @Test("Stacked commands sharing a wrap-width are never rejoined (CLAU separate-commands)")
+    func doesNotMergeStackedCommands() {
+        // Four independent shell commands; lines 1 and 3 are coincidentally both 30
+        // display cols, so detectWidth picks 30 as a "wrap column" and — without the
+        // fresh-command guard — rejoin smushed `cd …`+`python3 …` and `source …`+`pip
+        // …` into two unrunnable lines. The breaks are intentional statement bounds.
+        let input =
+            "cd ~/Projects/google-analytics\n"
+            + "python3 -m venv .venv\n"
+            + "source .venv/bin/activate.fish\n"
+            + "pip install google-analytics-data"
+        #expect(Repair.repair(input).text == input)
+        #expect(Repair.repair(input, options: .init(reflowParagraphs: true)).text == input)
+        // Even the aggressive full-collapse fallback must not glue two commands together.
+        #expect(Repair.repair(input, options: .init(joinAll: true)).text == input)
+        // And the watcher (default options) must not mutate it at all.
+        #expect(!Repair.repair(input).report.changed)
+    }
+
+    @Test("startsFreshCommand: known-tool or VAR=value statement starts only")
+    func startsFreshCommandDetector() {
+        #expect(Repair.startsFreshCommand("python3 -m venv .venv"))
+        #expect(Repair.startsFreshCommand("pip install google-analytics-data"))
+        #expect(Repair.startsFreshCommand("cd ~/Projects/google-analytics"))
+        #expect(Repair.startsFreshCommand("FOO=bar npm test"))
+        // Not fresh commands: genuine wrap remainders that resume mid-statement with
+        // the argument to a trailing flag, a bare path, or a continued word.
+        #expect(!Repair.startsFreshCommand("/work --env CCFIX_TERMINALS=com.apple.Terminal"))
+        #expect(!Repair.startsFreshCommand("ghcr.io/example/ccfix:latest /bin/bash --login"))
+        #expect(!Repair.startsFreshCommand("libx264 -preset slow -crf 22"))
+        #expect(!Repair.startsFreshCommand("copy the signed artifact into the volume"))
+    }
+
     @Test("endsWithComment: unquoted word-boundary # only")
     func endsWithCommentDetector() {
         #expect(Repair.endsWithComment("brew install foo     # a comment"))
@@ -388,6 +421,44 @@ struct RepairTests {
             options: .init(forcedWidth: 42)
         )
         #expect(result.text == head + " short")
+    }
+
+    @Test("Case 4: a long token at the tail of a spaced line rejoins with no space")
+    func case4MidTokenRejoinInSpacedLine() {
+        // The §5-case-4 break the `solid` whole-line test misses: a long unbreakable
+        // token (a URL) at the *tail* of an otherwise-spaced command line. The left
+        // line has interior spaces (`gcloud auth …`) so it is not "solid", but the
+        // token straddling the seam (`…https://www.g` + `oogleapis…`) is far wider than
+        // the wrap column, so the break was forced mid-token — rejoin with NO space.
+        // The injected-space bug split the URL into an invalid `https://www.g` scope.
+        let input =
+            "gcloud auth application-default login --scopes=openid,"
+            + "https://www.googleapis.com/auth/userinfo.email,"
+            + "https://www.googleapis.com/auth/cloud-platform,https://www.g\n"
+            + "oogleapis.com/auth/cse,https://www.googleapis.com/auth/analytics.readonly"
+        let expected =
+            "gcloud auth application-default login --scopes=openid,"
+            + "https://www.googleapis.com/auth/userinfo.email,"
+            + "https://www.googleapis.com/auth/cloud-platform,"
+            + "https://www.googleapis.com/auth/cse,"
+            + "https://www.googleapis.com/auth/analytics.readonly"
+        let once = Repair.repair(input).text
+        #expect(once == expected)
+        #expect(!once.contains("www.g "), "a space was injected mid-URL")
+        // Idempotent: a second pass must not re-wrap or alter the repaired line.
+        #expect(Repair.repair(once).text == once)
+    }
+
+    @Test("seamIsMidToken needs interior whitespace: a lone full token keeps the case-1 space")
+    func midTokenSeamIgnoresLoneTokenLines() {
+        // A lone full token line (no interior space) + short remainder stays a
+        // single-space join (the §5 case-1 lock), even though the boundary token is
+        // wider than the column — only a spaced line's tail token triggers the seam.
+        let head = String(repeating: "x", count: 42)
+        #expect(
+            Repair.rejoin(head + "\n/tmp/out.json", profile: .claudeCode,
+                options: .init(forcedWidth: 42)).text == head + " /tmp/out.json"
+        )
     }
 
     @Test("Box-drawing table rows are never rejoined into one line (F5)")
