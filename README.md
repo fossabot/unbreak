@@ -6,6 +6,7 @@
 [![Swift versions](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fbart-turczynski%2Funbreak%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/bart-turczynski/unbreak)
 [![Platforms](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fbart-turczynski%2Funbreak%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/bart-turczynski/unbreak)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fbart-turczynski%2Funbreak.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fbart-turczynski%2Funbreak?ref=badge_shield)
 
 > Repairs terminal-wrapped clipboard commands from grid-renderer
 > agent CLIs (Claude Code, Gemini CLI, Codex CLI) so they paste as clean,
@@ -136,3 +137,7 @@ fixture corpus enforces zero watch-mode mutations on normal copies.
 
 Deferred to v2 (§12): Gemini CLI / Codex CLI wrap profiles (§6.6), bottles, and a
 homebrew-core submission.
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fbart-turczynski%2Funbreak.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fbart-turczynski%2Funbreak?ref=badge_large)
