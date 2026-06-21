@@ -57,6 +57,15 @@ case .run(let arguments):
 /// allowlist/size bound/thresholds, the wrap profile, and the poll interval.
 func runWatchDaemon(dryRun: Bool, options: RepairOptions, config: UnbreakConfig) -> Never {
     #if canImport(AppKit)
+    // Single-instance guard (§7.4): only one *mutating* watcher may run, or two
+    // daemons double-process every copy and corrupt it. Held for the process
+    // lifetime; dry-run never mutates so it does not contend for the lock.
+    let lock = WatchLock()
+    _ = acquireActiveWatchLock(lock, dryRun: dryRun) { message in
+        FileHandle.standardError.write(Data((message + "\n").utf8))
+    }
+    _ = lock  // retained so the lock stays taken for the lifetime of the process
+
     let watcher = Watcher.system()
     let session = WatchSession(
         watcher: watcher,
